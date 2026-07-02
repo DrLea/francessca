@@ -1,0 +1,34 @@
+# Francessca frontend image (Next.js, standalone output)
+
+# 1. Install dependencies (incl. devDeps needed to build)
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# 2. Build the app
+FROM node:20-alpine AS builder
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# NEXT_PUBLIC_* values are inlined at build time. Defaults in code point at
+# http://localhost:8000, which is correct for the browser in a local setup.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+RUN npm run build
+
+# 3. Minimal runtime image serving the standalone server
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+# Standalone output bundles only what's needed to run `node server.js`.
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+CMD ["node", "server.js"]
