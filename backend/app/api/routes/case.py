@@ -12,31 +12,32 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.repositories.document_repo import CaseRepository
 from app.schemas.case import CaseExportRequest, CaseOut
+from app.schemas.timeline import TimelineEventOut
 from app.services.case_service import CaseService
 from app.services.export_service import ExportService
-from app.services.templates import CATEGORIES, TEMPLATES
+from app.services.templates import CATEGORIES, TEMPLATES, translate_template
+from app.services.timeline_service import TimelineService
 
 router = APIRouter(prefix="/case", tags=["case"])
 
 
 @router.get("/templates")
-def list_templates() -> dict:
+def list_templates(lang: str = "en") -> dict:
     return {
         "categories": CATEGORIES,
-        "templates": [
-            {
-                "id": t.id,
-                "category": t.category,
-                "title": t.title,
-                "description": t.description,
-                "fields": [
-                    {"key": f.key, "label": f.label, "required": f.required}
-                    for f in t.fields
-                ],
-            }
-            for t in TEMPLATES.values()
-        ],
+        "templates": [translate_template(t, lang) for t in TEMPLATES.values()],
     }
+
+
+@router.get("/timeline", response_model=list[TimelineEventOut])
+def get_timeline(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> list[TimelineEventOut]:
+    """The auto-extracted, chronological timeline built from every uploaded
+    document and chat message — Francessca's alternative to manually
+    assembling a chronology by hand."""
+    events = TimelineService(db).list_for_user(user.id)
+    return [TimelineEventOut.model_validate(e) for e in events]
 
 
 @router.post("/summary", response_model=CaseOut)

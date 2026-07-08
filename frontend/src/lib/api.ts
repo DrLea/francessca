@@ -109,6 +109,7 @@ export interface DashboardData {
   documents: number;
   cases: number;
   exports: number;
+  timeline_events: number;
   tokens_used: number;
   token_limit: number | null;
 }
@@ -124,6 +125,22 @@ export interface CaseExportResult {
   case_id: number;
   pdf_export_id: number;
   zip_export_id?: number;
+}
+
+export interface TimelineEvent {
+  id: number;
+  event_date: string | null;
+  date_label: string;
+  description: string;
+  is_deadline: boolean;
+  source_type: "document" | "message" | "manual";
+  source_id: number | null;
+  created_at: string;
+}
+
+export interface Language {
+  code: string;
+  name: string;
 }
 
 // ---- API -----------------------------------------------------------------
@@ -149,6 +166,13 @@ export const api = {
     }),
 
   me: () => request<User>("/me"),
+
+  updateMe: (body: { full_name?: string; language?: string }) =>
+    request<User>("/me", { method: "PATCH", body: JSON.stringify(body) }),
+
+  languages: () => request<Language[]>("/meta/languages"),
+
+  timeline: () => request<TimelineEvent[]>("/case/timeline"),
 
   listConversations: () => request<Conversation[]>("/chat"),
 

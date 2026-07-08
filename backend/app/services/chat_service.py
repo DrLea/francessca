@@ -4,9 +4,11 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.languages import language_instruction
 from app.core.prompts import USER_CONTENT_GUARD
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole
+from app.models.timeline_event import TimelineSourceType
 from app.models.user import User
 from app.repositories.conversation_repo import (
     ConversationRepository,
@@ -16,6 +18,7 @@ from app.repositories.document_repo import DocumentRepository
 from app.schemas.chat import ChatRequest
 from app.services.ai_service import AIResult, AIService
 from app.services.prompt_service import PromptService
+from app.services.timeline_service import TimelineService
 from app.services.token_service import TokenService, estimate_tokens
 
 # Keep the prompt context bounded: only send the most recent N turns.
@@ -31,6 +34,7 @@ class ChatService:
         self.tokens = TokenService(db)
         self.prompts = PromptService(db)
         self.ai = ai or AIService()
+        self.timeline = TimelineService(db, ai=self.ai)
 
     def _get_or_create_conversation(
         self, user: User, conversation_id: int | None, first_message: str
@@ -65,7 +69,9 @@ class ChatService:
 
         history = self.messages.history(conv.id) if conv.id else []
         doc_context = self._build_document_context(user, data.document_ids)
-        system_prompt = self.prompts.active_system_prompt()
+        system_prompt = self.prompts.active_system_prompt() + language_instruction(
+            user.language
+        )
 
         # Build the message list for the model (recent history + new turn).
         model_messages: list[dict[str, str]] = []
@@ -111,6 +117,16 @@ class ChatService:
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
             model=result.model,
+            conversation_id=conv.id,
+        )
+
+        # Best-effort: pull any dated facts out of the user's message into the
+        # running case timeline. Never raises — failures are logged and skipped.
+        self.timeline.extract_from_text(
+            user,
+            data.message,
+            source_type=TimelineSourceType.message,
+            source_id=user_msg.id,
             conversation_id=conv.id,
         )
 

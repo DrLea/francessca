@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   type Conversation,
@@ -8,10 +8,13 @@ import {
   type Message,
 } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import { Button, Card, Disclaimer, Input, Spinner } from "@/components/ui";
+import { useI18n } from "@/lib/i18n";
+import { Button, Card, Disclaimer, Spinner, Textarea } from "@/components/ui";
+import clsx from "clsx";
 
 export default function ChatPage() {
   const { user, loading } = useRequireAuth();
+  const { t, locale } = useI18n();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<number | undefined>();
@@ -20,6 +23,7 @@ export default function ChatPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Document attachment
   const [docs, setDocs] = useState<DocumentMeta[]>([]);
@@ -80,6 +84,15 @@ export default function ChatPage() {
     }
   }
 
+  function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter sends the message; Shift+Enter (or Enter with an IME composing)
+    // inserts a newline instead, matching familiar chat-app conventions.
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  }
+
   async function exportCase() {
     if (!activeId) return;
     setExporting(true);
@@ -90,7 +103,7 @@ export default function ChatPage() {
         include_documents: true,
       });
       await api.downloadExport(res.pdf_export_id, `case_${res.case_id}_summary.pdf`);
-      setExportMsg("Case summary PDF downloaded.");
+      setExportMsg(t("chat.exportDone"));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -101,7 +114,7 @@ export default function ChatPage() {
   if (loading || !user)
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        {loading && <Spinner label="Loading…" />}
+        {loading && <Spinner label={t("common.loading")} />}
       </div>
     );
 
@@ -110,23 +123,25 @@ export default function ChatPage() {
       {/* Sidebar */}
       <aside className="flex flex-col gap-2">
         <Button onClick={newConversation} variant="secondary">
-          + New conversation
+          {t("chat.newConversation")}
         </Button>
         <div className="flex flex-col gap-1">
           {conversations.map((c) => (
             <button
               key={c.id}
               onClick={() => openConversation(c.id)}
-              className={
-                "truncate rounded-md px-3 py-2 text-left text-sm " +
-                (activeId === c.id ? "bg-brand text-white" : "hover:bg-slate-100")
-              }
+              className={clsx(
+                "truncate rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                activeId === c.id
+                  ? "bg-brand text-white shadow-soft"
+                  : "text-slate-600 hover:bg-slate-100",
+              )}
             >
               {c.title}
             </button>
           ))}
           {conversations.length === 0 && (
-            <p className="px-1 text-xs text-slate-400">No conversations yet.</p>
+            <p className="px-1 text-xs text-slate-400">{t("chat.noConversations")}</p>
           )}
         </div>
       </aside>
@@ -136,42 +151,40 @@ export default function ChatPage() {
         <div className="flex items-center justify-between">
           {remaining !== null && (
             <span className="text-xs text-slate-500">
-              {remaining.toLocaleString()} tokens remaining
+              {t("chat.tokensRemaining", { count: remaining.toLocaleString(locale) })}
             </span>
           )}
           {activeId && (
             <Button onClick={exportCase} disabled={exporting} variant="ghost">
-              {exporting ? "Generating…" : "Export case PDF"}
+              {exporting ? t("chat.generating") : t("chat.exportPdf")}
             </Button>
           )}
         </div>
         {exportMsg && <p className="text-sm text-green-600">{exportMsg}</p>}
 
-        <Card className="flex min-h-[45vh] flex-col gap-3">
+        <Card className="flex min-h-[45vh] flex-col gap-3 overflow-y-auto">
           {messages.length === 0 && (
-            <p className="text-slate-500">
-              Tell me what happened. For example: “I was fired yesterday.”
-            </p>
+            <p className="text-slate-500">{t("chat.emptyPrompt")}</p>
           )}
           {messages.map((m) => (
             <div
               key={m.id}
               className={
                 m.role === "user"
-                  ? "max-w-[80%] self-end whitespace-pre-wrap rounded-lg bg-brand px-3 py-2 text-sm text-white"
-                  : "max-w-[80%] self-start whitespace-pre-wrap rounded-lg bg-slate-100 px-3 py-2 text-sm"
+                  ? "max-w-[80%] self-end whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand px-4 py-2.5 text-sm text-white shadow-soft"
+                  : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-2.5 text-sm text-slate-800"
               }
             >
               {m.content}
             </div>
           ))}
-          {busy && <Spinner label="Francessca is typing…" />}
+          {busy && <Spinner label={t("chat.typing")} />}
           {error && <p className="text-sm text-red-600">{error}</p>}
         </Card>
 
         {docs.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="text-slate-500">Attach documents:</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-slate-500">{t("chat.attachDocuments")}</span>
             {docs.map((d) => {
               const on = attached.includes(d.id);
               return (
@@ -182,12 +195,12 @@ export default function ChatPage() {
                       on ? a.filter((x) => x !== d.id) : [...a, d.id],
                     )
                   }
-                  className={
-                    "rounded-full border px-2 py-0.5 " +
-                    (on
+                  className={clsx(
+                    "rounded-full border px-2.5 py-0.5 transition-colors",
+                    on
                       ? "border-brand bg-brand/10 text-brand"
-                      : "border-slate-300 text-slate-500")
-                  }
+                      : "border-slate-300 text-slate-500 hover:border-slate-400",
+                  )}
                 >
                   {d.filename}
                 </button>
@@ -196,14 +209,21 @@ export default function ChatPage() {
           </div>
         )}
 
-        <form onSubmit={send} className="flex gap-2">
-          <Input
+        <form
+          ref={formRef}
+          onSubmit={send}
+          className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-soft transition-shadow focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20"
+        >
+          <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message…"
+            onKeyDown={onComposerKeyDown}
+            placeholder={t("chat.typeMessage")}
+            maxHeightPx={200}
+            bare
           />
-          <Button type="submit" disabled={busy}>
-            Send
+          <Button type="submit" disabled={busy || !input.trim()} className="shrink-0">
+            {t("chat.send")}
           </Button>
         </form>
         <Disclaimer />

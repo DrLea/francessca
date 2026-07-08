@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     max_upload_size: int = Field(26_214_400, alias="MAX_UPLOAD_SIZE")
     upload_dir: str = Field("/data/uploads", alias="UPLOAD_DIR")
 
+    # When true (default), the lawyer directory is seeded with a fictional
+    # sample dataset on first startup so the directory/search UI works without
+    # a live scrape. Set to false once real data is synced via the scraper.
+    use_fake_lawyers_db: bool = Field(True, alias="USE_FAKE_LAWYERS_DB")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

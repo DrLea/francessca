@@ -61,6 +61,9 @@ def ensure_active_prompt(db) -> None:
 
 
 def ensure_lawyers(db) -> None:
+    if not settings.use_fake_lawyers_db:
+        log.info("USE_FAKE_LAWYERS_DB is false; skipping fake lawyer seed")
+        return
     count = db.scalar(select(func.count()).select_from(Lawyer))
     if count:
         return

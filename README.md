@@ -114,9 +114,31 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 | GET | `/lawyers/search` | Search by specialization / city / language |
 | POST | `/case/export` | Generate case summary + PDF (and ZIP of documents) |
 | GET | `/case/export/{id}/download` | Download an export |
+| GET | `/case/timeline` | Auto-extracted, chronological case timeline |
+| GET | `/meta/languages` | Supported UI/chat languages |
 | GET | `/dashboard` | Dashboard counts |
 | GET | `/usage` | Token usage and remaining allowance |
 | `/admin/*` | | User management, token limits, prompt versions, lawyer sync, AI usage (admin only) |
+
+## Case timeline
+
+Every uploaded document and chat message is passed through a best-effort AI extraction step (`app/services/timeline_service.py`) that pulls out concrete, dated facts (a termination, a notice, a deadline, a meeting) into a `timeline_events` table — a running chronology the user would otherwise have to assemble by hand. Extraction:
+
+- reuses the mandatory Francessca system prompt, so the same no-advice/no-prediction guardrails apply;
+- never invents dates — only events actually stated in the text;
+- never blocks the upload/chat flow — a parsing failure, network error, or exhausted token budget is logged and simply yields zero new events.
+
+`GET /case/timeline` returns the chronology (dated events first, undated ones last); it also feeds into case-summary generation (`CaseService`) and is rendered as a dedicated, dated section in the exported PDF (`ExportService`). Because each extraction is a real Claude call, it adds one extra AI request (and its token cost) per document upload and per chat message — for production this is worth moving to a background task/queue so it doesn't add latency to the request path; it currently runs synchronously.
+
+## Multilingual conversation, exports & forms
+
+Users have a `language` preference (`GET/PATCH /me`, `GET /meta/languages` for the supported list: English, German, Turkish, Arabic, Ukrainian, Russian, Polish, Romanian). It drives three things:
+
+- **Chat** (`app/core/languages.py::language_instruction`): appended to the system prompt so replies come back in the user's language regardless of which language they type in.
+- **Case summaries & exports** (`document_language_instruction`): generated narrative/summary text is produced directly in the user's language; the PDF's section headers and disclaimer are translated (`export_service.py`).
+- **Form templates** (`app/services/templates.py`): titles, descriptions, and field labels are translated; `GET /case/templates?lang=xx` returns the translated version, falling back to English for anything not yet covered.
+
+These are first-pass translations aimed at making the product usable immediately in each language — they have **not** been reviewed by a native legal-domain speaker and should get that review before being relied on in production, especially the AR/UK/RU/PL/RO form and export text. Also note: the PDF export does not yet do Arabic bidi/reshaping, so Arabic text in the PDF will not render right-to-left correctly without adding an Arabic-aware font and `python-bidi`/`arabic-reshaper`.
 
 ## Token limits
 

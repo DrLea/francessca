@@ -10,9 +10,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.logging import get_logger, log_event
 from app.models.document import Document
+from app.models.timeline_event import TimelineSourceType
 from app.models.user import User
 from app.repositories.document_repo import DocumentRepository
+from app.services.ai_service import AIService
 from app.services.ocr_service import extract_text
+from app.services.timeline_service import TimelineService
 
 log = get_logger("francessca.files")
 
@@ -29,9 +32,10 @@ ALLOWED_MIMES = {
 
 
 class FileService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, ai: AIService | None = None) -> None:
         self.db = db
         self.documents = DocumentRepository(db)
+        self.timeline = TimelineService(db, ai=ai)
         os.makedirs(settings.upload_dir, exist_ok=True)
 
     def save_upload(self, user: User, upload: UploadFile) -> Document:
@@ -80,4 +84,12 @@ class FileService:
             log, "file_upload", user_id=user.id, doc_id=doc.id,
             size=size, mime=mime, ocr=bool(extracted),
         )
+
+        # Best-effort: pull dated facts out of the document into the running
+        # case timeline. Never raises — failures are logged and skipped.
+        self.timeline.extract_from_text(
+            user, extracted, source_type=TimelineSourceType.document, source_id=doc.id
+        )
+        self.db.commit()
+
         return doc

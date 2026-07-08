@@ -11,6 +11,7 @@ import json
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.languages import document_language_instruction
 from app.core.logging import get_logger
 from app.models.case import Case
 from app.models.message import MessageRole
@@ -20,6 +21,7 @@ from app.repositories.document_repo import CaseRepository, DocumentRepository
 from app.schemas.case import CaseSummary
 from app.services.ai_service import AIService
 from app.services.prompt_service import PromptService
+from app.services.timeline_service import TimelineService
 from app.services.token_service import TokenService
 
 log = get_logger("francessca.case")
@@ -42,6 +44,7 @@ class CaseService:
         self.cases = CaseRepository(db)
         self.prompts = PromptService(db)
         self.tokens = TokenService(db)
+        self.timeline = TimelineService(db)
         self.ai = ai or AIService()
 
     def generate_summary(
@@ -61,18 +64,30 @@ class CaseService:
         )
         doc_names = [d.filename for d in self.documents.list_for_user(user.id)]
 
+        # Feed in the already-extracted timeline as authoritative dated facts
+        # so the model doesn't have to re-derive dates from free-form chat.
+        events = self.timeline.list_for_user(user.id)
+        timeline_context = "\n".join(
+            f"- {e.event_date.isoformat() if e.event_date else e.date_label or 'undated'}: "
+            f"{e.description}" + (" [DEADLINE]" if e.is_deadline else "")
+            for e in events
+        )
+
         model_messages = [
             {
                 "role": "user",
                 "content": (
                     f"Conversation transcript:\n{transcript}\n\n"
                     f"Uploaded documents: {', '.join(doc_names) or 'none'}\n\n"
+                    f"Already-extracted timeline facts (use these dates as authoritative "
+                    f"if referenced): \n{timeline_context or 'none'}\n\n"
                     f"{_SUMMARY_INSTRUCTION}"
                 ),
             }
         ]
         result = self.ai.complete(
-            system_prompt=self.prompts.active_system_prompt(),
+            system_prompt=self.prompts.active_system_prompt()
+            + document_language_instruction(user.language),
             messages=model_messages,
             max_tokens=1500,
         )

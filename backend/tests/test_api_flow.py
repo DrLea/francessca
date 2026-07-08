@@ -37,8 +37,10 @@ def test_chat_uses_fake_ai_and_records_tokens(client, db_session, monkeypatch):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert "country" in body["message"]["content"].lower()
-    assert body["tokens_used"] == 70  # 50 in + 20 out
-    assert body["tokens_remaining"] == 100_000 - 70
+    # 50 in + 20 out for the chat reply, plus another 50 in + 20 out for the
+    # best-effort timeline-extraction call the FakeAI also answers.
+    assert body["tokens_used"] == 140
+    assert body["tokens_remaining"] == 100_000 - 140
 
 
 def test_lawyer_search(client, db_session):

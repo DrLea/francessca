@@ -1,24 +1,26 @@
+"use client";
+
 import Link from "next/link";
 import { Button, Card, Disclaimer } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export default function Home() {
+  const t = useT();
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-16">
-      <h1 className="text-4xl font-bold text-brand">Francessca</h1>
-      <p className="text-lg text-slate-700">
-        Get organized before you speak with a lawyer. Francessca asks the right
-        questions, collects your facts, helps fill standard forms, and produces a
-        structured summary you can hand to a qualified lawyer in Germany.
-      </p>
-      <Card>
-        <div className="flex gap-3">
+    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-20">
+      <div className="flex flex-col gap-4 animate-fade-in">
+        <h1 className="text-5xl font-bold tracking-tight text-slate-900">
+          Franc<span className="text-brand">essca</span>
+        </h1>
+        <p className="text-lg leading-relaxed text-slate-600">{t("home.tagline")}</p>
+      </div>
+      <Card className="animate-fade-in">
+        <div className="flex flex-wrap gap-3">
           <Link href="/login">
-            <Button>Get started</Button>
+            <Button>{t("home.getStarted")}</Button>
           </Link>
           <Link href="/lawyers">
-            <Button className="bg-slate-700 hover:bg-slate-800">
-              Find a lawyer
-            </Button>
+            <Button variant="secondary">{t("home.findLawyer")}</Button>
           </Link>
         </div>
         <Disclaimer />

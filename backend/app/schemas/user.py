@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
+from app.core.languages import SUPPORTED_LANGUAGES
 from app.models.user import UserRole, UserTier
 
 
@@ -25,6 +26,15 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     full_name: str | None = None
     language: str | None = None
+
+    @field_validator("language")
+    @classmethod
+    def _validate_language(cls, v: str | None) -> str | None:
+        if v is not None and v not in SUPPORTED_LANGUAGES:
+            raise ValueError(
+                f"Unsupported language '{v}'. Supported: {', '.join(SUPPORTED_LANGUAGES)}"
+            )
+        return v
 
 
 class AdminUserUpdate(BaseModel):

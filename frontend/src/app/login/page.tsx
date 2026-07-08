@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import { GoogleButton } from "@/components/GoogleButton";
 import { Button, Card, Disclaimer, Input } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, signIn } = useAuth();
+  const t = useT();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,28 +57,28 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-16">
-      <Card>
-        <h1 className="mb-4 text-2xl font-semibold">
-          {mode === "login" ? "Log in" : "Create account"}
+      <Card className="animate-fade-in">
+        <h1 className="mb-4 text-2xl font-semibold tracking-tight text-slate-900">
+          {mode === "login" ? t("login.titleLogin") : t("login.titleRegister")}
         </h1>
         <form onSubmit={submit} className="flex flex-col gap-3">
           {mode === "register" && (
             <Input
-              placeholder="Full name (optional)"
+              placeholder={t("login.fullNamePlaceholder")}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
           )}
           <Input
             type="email"
-            placeholder="Email"
+            placeholder={t("login.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
           <Input
             type="password"
-            placeholder="Password"
+            placeholder={t("login.passwordPlaceholder")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -84,12 +86,12 @@ export default function LoginPage() {
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={loading}>
-            {loading ? "Please wait…" : mode === "login" ? "Log in" : "Sign up"}
+            {loading ? t("login.pleaseWait") : mode === "login" ? t("login.titleLogin") : t("login.signUp")}
           </Button>
         </form>
 
         <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
+          <span className="h-px flex-1 bg-slate-200" /> {t("login.or")} <span className="h-px flex-1 bg-slate-200" />
         </div>
         <GoogleButton onCredential={onGoogle} />
 
@@ -97,7 +99,7 @@ export default function LoginPage() {
           className="mt-4 text-sm text-brand underline"
           onClick={() => setMode(mode === "login" ? "register" : "login")}
         >
-          {mode === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
+          {mode === "login" ? t("login.needAccount") : t("login.haveAccount")}
         </button>
         <Disclaimer />
       </Card>

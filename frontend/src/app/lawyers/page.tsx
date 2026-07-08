@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { api, type Lawyer } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { useT } from "@/lib/i18n";
 import { Badge, Button, Card, Input, Spinner } from "@/components/ui";
 
 export default function LawyersPage() {
   const { user, loading } = useRequireAuth();
+  const t = useT();
   const [specialization, setSpecialization] = useState("");
   const [city, setCity] = useState("");
   const [language, setLanguage] = useState("");
@@ -33,36 +35,40 @@ export default function LawyersPage() {
   if (loading || !user)
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        {loading && <Spinner label="Loading…" />}
+        {loading && <Spinner label={t("common.loading")} />}
       </div>
     );
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-10">
-      <h1 className="text-2xl font-semibold">Find a lawyer</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("lawyers.title")}</h1>
       <form onSubmit={search} className="grid grid-cols-1 gap-2 sm:grid-cols-4">
         <Input
-          placeholder="Specialization"
+          placeholder={t("lawyers.specialization")}
           value={specialization}
           onChange={(e) => setSpecialization(e.target.value)}
         />
-        <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
         <Input
-          placeholder="Language"
+          placeholder={t("lawyers.city")}
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+        />
+        <Input
+          placeholder={t("lawyers.language")}
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
         />
         <Button type="submit" disabled={busy}>
-          {busy ? "Searching…" : "Search"}
+          {busy ? t("lawyers.searching") : t("lawyers.search")}
         </Button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex flex-col gap-3">
         {results.map((lw) => (
-          <Card key={lw.id}>
+          <Card key={lw.id} className="transition-shadow hover:shadow-lg">
             <div className="flex items-baseline justify-between">
-              <h2 className="font-semibold">{lw.name}</h2>
+              <h2 className="font-semibold text-slate-900">{lw.name}</h2>
               <span className="text-sm text-slate-500">{lw.city}</span>
             </div>
             {lw.law_firm && <p className="text-sm text-slate-600">{lw.law_firm}</p>}
@@ -74,13 +80,13 @@ export default function LawyersPage() {
             </div>
             {lw.languages.length > 0 && (
               <p className="mt-1 text-xs text-slate-500">
-                Languages: {lw.languages.join(", ")}
+                {t("lawyers.languagesLabel", { list: lw.languages.join(", ") })}
               </p>
             )}
             <div className="mt-2 flex gap-4 text-sm">
               {lw.email && (
                 <a className="text-brand underline" href={`mailto:${lw.email}`}>
-                  Email
+                  {t("lawyers.email")}
                 </a>
               )}
               {lw.phone && (
@@ -95,14 +101,14 @@ export default function LawyersPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Website
+                  {t("lawyers.website")}
                 </a>
               )}
             </div>
           </Card>
         ))}
         {searched && results.length === 0 && (
-          <p className="text-sm text-slate-400">No lawyers matched your search.</p>
+          <p className="text-sm text-slate-400">{t("lawyers.noResults")}</p>
         )}
       </div>
     </main>

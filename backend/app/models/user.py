@@ -54,6 +54,9 @@ class User(Base):
     documents: Mapped[list["Document"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    timeline_events: Mapped[list["TimelineEvent"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     @property
     def is_unlimited(self) -> bool:

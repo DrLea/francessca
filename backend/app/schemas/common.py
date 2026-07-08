@@ -22,6 +22,7 @@ class DashboardOut(BaseModel):
     documents: int
     cases: int
     exports: int
+    timeline_events: int
     tokens_used: int
     token_limit: int | None
 
