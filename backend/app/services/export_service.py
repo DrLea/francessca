@@ -9,6 +9,7 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import (
     ListFlowable,
     ListItem,
@@ -132,6 +133,11 @@ def _disclaimer(lang: str) -> str:
     return _DISCLAIMER if lang == "en" else _DISCLAIMER_TRANSLATIONS.get(lang, _DISCLAIMER)
 
 
+# Public alias — reused by other services (e.g. FileService's translated-document
+# download) that need the same disclaimer copy without duplicating it.
+disclaimer_text = _disclaimer
+
+
 class ExportService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -208,10 +214,8 @@ class ExportService:
     ) -> bytes:
         """Render the case-summary PDF.
 
-        Note on non-Latin scripts: labels and AI-generated text are rendered
-        as-is. Right-to-left scripts (Arabic) will display translated text
-        without bidi reshaping — full RTL layout would need an Arabic-aware
-        font plus python-bidi/arabic-reshaper, which isn't wired in yet.
+        Uses DejaVu fonts when available for better Unicode support (Cyrillic, Greek, etc).
+        Arabic text is rendered as-is without bidi reshaping (RTL layout not yet implemented).
         """
         buffer = BytesIO()
         doc = SimpleDocTemplate(
@@ -221,11 +225,17 @@ class ExportService:
             title=title,
         )
         styles = getSampleStyleSheet()
-        h1 = ParagraphStyle("H1", parent=styles["Title"], fontSize=20)
-        h2 = ParagraphStyle("H2", parent=styles["Heading2"], spaceBefore=12)
-        body = ParagraphStyle("Body", parent=styles["BodyText"], alignment=TA_LEFT)
+        # Use DejaVu font if registered, otherwise fall back to default.
+        font_name = "DejaVuSans"
+        try:
+            pdfmetrics.getFont(font_name)
+        except Exception:
+            font_name = "Helvetica"
+        h1 = ParagraphStyle("H1", parent=styles["Title"], fontSize=20, fontName=font_name)
+        h2 = ParagraphStyle("H2", parent=styles["Heading2"], spaceBefore=12, fontName=font_name)
+        body = ParagraphStyle("Body", parent=styles["BodyText"], alignment=TA_LEFT, fontName=font_name)
         small = ParagraphStyle("Small", parent=styles["BodyText"], fontSize=8,
-                               textColor="#666666")
+                               textColor="#666666", fontName=font_name)
 
         disclaimer = _disclaimer(lang)
 

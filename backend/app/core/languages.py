@@ -69,3 +69,20 @@ def document_language_instruction(code: str) -> str:
         f"narrative) in {name}. Keep any requested JSON keys in English "
         f"exactly as specified — only the string values should be in {name}."
     )
+
+
+def translation_instruction(code: str) -> str:
+    """Used when translating the full text of an uploaded document (e.g. for
+    the "download translated file" feature). Unlike `document_language_instruction`,
+    this is not generating new content — it must faithfully translate what's
+    already there, without summarizing, commenting, or adding anything.
+    """
+    name = _ENGLISH_NAME.get(normalize_language(code), "English")
+    return (
+        f"\n\nTranslate the user-provided document text into {name}, in full. "
+        f"Preserve the original meaning, structure, and formatting as closely "
+        f"as possible, and keep any dates, names, numbers, and figures exactly "
+        f"as they appear. Output ONLY the translated text — no preamble, no "
+        f"commentary, no explanations, and nothing added that wasn't in the "
+        f"original."
+    )

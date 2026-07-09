@@ -15,18 +15,59 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+type FileAction = "download" | "translate" | "delete";
+
 export default function FilesPage() {
   const { user, loading } = useRequireAuth();
-  const { t, locale } = useI18n();
+  const { t, locale, lang } = useI18n();
   const [files, setFiles] = useState<DocumentMeta[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Record<number, FileAction | undefined>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
     api.listFiles().then(setFiles).catch((e) => setError(e.message));
   }, [user]);
+
+  async function onDownload(doc: DocumentMeta) {
+    setError(null);
+    setPending((p) => ({ ...p, [doc.id]: "download" }));
+    try {
+      await api.downloadFile(doc.id, doc.filename);
+    } catch (err) {
+      setError((err as Error).message || t("files.actionError"));
+    } finally {
+      setPending((p) => ({ ...p, [doc.id]: undefined }));
+    }
+  }
+
+  async function onDownloadTranslated(doc: DocumentMeta) {
+    setError(null);
+    setPending((p) => ({ ...p, [doc.id]: "translate" }));
+    try {
+      const stem = doc.filename.replace(/\.[^./]+$/, "");
+      await api.downloadTranslatedFile(doc.id, lang, `${stem}_${lang}.pdf`);
+    } catch (err) {
+      setError((err as Error).message || t("files.actionError"));
+    } finally {
+      setPending((p) => ({ ...p, [doc.id]: undefined }));
+    }
+  }
+
+  async function onDelete(doc: DocumentMeta) {
+    if (!window.confirm(t("files.deleteConfirm"))) return;
+    setError(null);
+    setPending((p) => ({ ...p, [doc.id]: "delete" }));
+    try {
+      await api.deleteFile(doc.id);
+      setFiles((f) => f.filter((d) => d.id !== doc.id));
+    } catch (err) {
+      setError((err as Error).message || t("files.actionError"));
+      setPending((p) => ({ ...p, [doc.id]: undefined }));
+    }
+  }
 
   async function onSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -77,24 +118,53 @@ export default function FilesPage() {
       </Card>
 
       <div className="mt-6 flex flex-col gap-2">
-        {files.map((d) => (
-          <Card
-            key={d.id}
-            className="flex items-center justify-between py-3 transition-shadow hover:shadow-lg"
-          >
-            <div>
-              <div className="font-medium text-slate-800">{d.filename}</div>
-              <div className="text-xs text-slate-500">
-                {humanSize(d.size)} · {new Date(d.uploaded_at).toLocaleDateString(locale)}
+        {files.map((d) => {
+          const action = pending[d.id];
+          return (
+            <Card key={d.id} className="py-3 transition-shadow hover:shadow-lg">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-slate-800">{d.filename}</div>
+                  <div className="text-xs text-slate-500">
+                    {humanSize(d.size)} · {new Date(d.uploaded_at).toLocaleDateString(locale)}
+                  </div>
+                </div>
+                {d.has_extracted_text ? (
+                  <Badge>{t("files.textExtracted")}</Badge>
+                ) : (
+                  <span className="shrink-0 text-xs text-slate-400">{t("files.noText")}</span>
+                )}
               </div>
-            </div>
-            {d.has_extracted_text ? (
-              <Badge>{t("files.textExtracted")}</Badge>
-            ) : (
-              <span className="text-xs text-slate-400">{t("files.noText")}</span>
-            )}
-          </Card>
-        ))}
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                <Button
+                  variant="ghost"
+                  className="!px-3 !py-1.5 text-xs"
+                  disabled={!!action}
+                  onClick={() => onDownload(d)}
+                >
+                  {action === "download" ? t("common.loading") : t("files.download")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="!px-3 !py-1.5 text-xs"
+                  disabled={!!action || !d.has_extracted_text}
+                  title={d.has_extracted_text ? undefined : t("files.noTextForTranslation")}
+                  onClick={() => onDownloadTranslated(d)}
+                >
+                  {action === "translate" ? t("files.translating") : t("files.downloadTranslated")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="!px-3 !py-1.5 text-xs text-red-600 hover:bg-red-50"
+                  disabled={!!action}
+                  onClick={() => onDelete(d)}
+                >
+                  {action === "delete" ? t("files.deleting") : t("files.delete")}
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
         {files.length === 0 && (
           <p className="text-sm text-slate-400">{t("files.noDocuments")}</p>
         )}

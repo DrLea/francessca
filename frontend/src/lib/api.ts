@@ -193,6 +193,44 @@ export const api = {
     return request<DocumentMeta>("/files", { method: "POST", body: form });
   },
 
+  deleteFile: (id: number) =>
+    request<{ detail: string }>(`/files/${id}`, { method: "DELETE" }),
+
+  // Fetches with the auth header attached and triggers a browser save —
+  // same pattern as downloadExport, since plain <a href> can't send Bearer tokens.
+  downloadFile: async (id: number, filename: string) => {
+    const res = await fetch(`${API_URL}/files/${id}/download`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new ApiError("Download failed", res.status);
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Translates the document's extracted text into `lang` (typically the
+  // currently selected UI language) and downloads the result as a PDF.
+  downloadTranslatedFile: async (id: number, lang: string, filename: string) => {
+    const res = await fetch(`${API_URL}/files/${id}/translate?lang=${encodeURIComponent(lang)}`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new ApiError(detail.detail ?? "Translation failed", res.status);
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  },
+
   searchLawyers: (params: {
     specialization?: string;
     city?: string;
