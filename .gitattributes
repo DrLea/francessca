@@ -1,0 +1,6 @@
+# Keep shell scripts LF, always. A CRLF shebang makes Linux containers
+# fail with: env: 'bash\r': No such file or directory
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile* text eol=lf
+*.yml text eol=lf

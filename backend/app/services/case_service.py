@@ -11,6 +11,7 @@ import json
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.clarify import render_questions_for_history
 from app.core.languages import document_language_instruction
 from app.core.logging import get_logger
 from app.models.case import Case
@@ -57,8 +58,15 @@ class CaseService:
             )
 
         history = self.messages.history(conv.id)
+        # Clarifying questions are stored beside the text, not inside it, so
+        # re-attach them or the transcript reads as if nothing was asked.
         transcript = "\n".join(
             f"{m.role.value.upper()}: {m.content}"
+            + (
+                "\n" + render_questions_for_history(m.questions)
+                if m.questions
+                else ""
+            )
             for m in history
             if m.role in (MessageRole.user, MessageRole.assistant)
         )

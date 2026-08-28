@@ -28,11 +28,12 @@ def send_message(
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     service = ChatService(db)
-    conv, assistant_msg = service.send_message(user, data)
+    conv, user_msg, assistant_msg = service.send_message(user, data)
     db.refresh(user)
     remaining = TokenService(db).remaining(user)
     return ChatResponse(
         conversation_id=conv.id,
+        user_message=MessageOut.model_validate(user_msg),
         message=MessageOut.model_validate(assistant_msg),
         tokens_used=user.tokens_used,
         tokens_remaining=remaining,

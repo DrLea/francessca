@@ -9,6 +9,10 @@ from app.models.export import Export  # noqa: F401
 from app.models.token_usage import TokenUsage  # noqa: F401
 from app.models.prompt_version import PromptVersion  # noqa: F401
 from app.models.timeline_event import TimelineEvent, TimelineSourceType  # noqa: F401
+from app.models.lawyer_application import (  # noqa: F401
+    ApplicationStatus,
+    LawyerApplication,
+)
 
 __all__ = [
     "User",
@@ -26,4 +30,6 @@ __all__ = [
     "PromptVersion",
     "TimelineEvent",
     "TimelineSourceType",
+    "LawyerApplication",
+    "ApplicationStatus",
 ]

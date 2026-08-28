@@ -26,10 +26,22 @@ export default function FilesPage() {
   const [pending, setPending] = useState<Record<number, FileAction | undefined>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Deep link from a timeline entry: /files?doc=<document id>.
+  const [highlighted, setHighlighted] = useState<number | null>(null);
+
   useEffect(() => {
     if (!user) return;
     api.listFiles().then(setFiles).catch((e) => setError(e.message));
   }, [user]);
+
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("doc"));
+    if (!id || files.length === 0) return;
+    setHighlighted(id);
+    document
+      .getElementById(`doc-${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [files]);
 
   async function onDownload(doc: DocumentMeta) {
     setError(null);
@@ -121,7 +133,14 @@ export default function FilesPage() {
         {files.map((d) => {
           const action = pending[d.id];
           return (
-            <Card key={d.id} className="py-3 transition-shadow hover:shadow-lg">
+            <Card
+              key={d.id}
+              id={`doc-${d.id}`}
+              className={
+                "py-3 transition-shadow hover:shadow-lg" +
+                (highlighted === d.id ? " ring-2 ring-brand" : "")
+              }
+            >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="truncate font-medium text-slate-800">{d.filename}</div>

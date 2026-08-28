@@ -3,14 +3,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  type ClarifyAnswer,
   type Conversation,
   type DocumentMeta,
   type Message,
 } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { Button, Card, Disclaimer, Spinner, Textarea } from "@/components/ui";
+import { Button, Disclaimer, Spinner, Textarea } from "@/components/ui";
+import { ClarifyPrompt } from "@/components/ClarifyPrompt";
+import { Markdown } from "@/components/Markdown";
 import clsx from "clsx";
+
+// Which conversation the user had open, so switching to Timeline or
+// Documents and back doesn't drop them into an empty chat.
+const ACTIVE_KEY = "francessca_active_conversation";
+// ...and how far down it they had scrolled, per conversation.
+const SCROLL_KEY = "francessca_chat_scroll";
+// Sentinel meaning "pin to the newest message" rather than a pixel offset.
+const BOTTOM = -1;
+
+function readScrollMap(): Record<string, number> {
+  try {
+    return JSON.parse(window.localStorage.getItem(SCROLL_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
 
 export default function ChatPage() {
   const { user, loading } = useRequireAuth();
@@ -24,6 +43,20 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Where to put the scroll position once the next render has painted:
+  // a remembered offset, BOTTOM, or null for "leave it alone".
+  const pendingScroll = useRef<number | null>(null);
+  const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Questions are pending only while the assistant's question turn is the
+  // last thing in the transcript — answering (or typing anything) pushes new
+  // messages on top and retires them.
+  const lastMessage = messages[messages.length - 1];
+  const pending =
+    lastMessage?.role === "assistant" && lastMessage.questions?.length
+      ? lastMessage
+      : null;
 
   // Document attachment
   const [docs, setDocs] = useState<DocumentMeta[]>([]);
@@ -43,17 +76,94 @@ export default function ChatPage() {
     api.listFiles().then(setDocs).catch(() => {});
   }, [user, loadConversations]);
 
+  // Reopen whatever the user was reading: an explicit deep link from a
+  // timeline entry (/chat?c=<id>) wins, otherwise the conversation they had
+  // open before navigating to another tab. Read from location rather than
+  // useSearchParams so the page still prerenders without a Suspense boundary.
+  useEffect(() => {
+    if (!user) return;
+    const fromLink = Number(new URLSearchParams(window.location.search).get("c"));
+    const remembered = Number(window.localStorage.getItem(ACTIVE_KEY) ?? 0);
+    const id = fromLink || remembered;
+    if (id) {
+      openConversation(id).catch(() => window.localStorage.removeItem(ACTIVE_KEY));
+    }
+    // Once only, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    if (activeId) window.localStorage.setItem(ACTIVE_KEY, String(activeId));
+  }, [activeId]);
+
   async function openConversation(id: number) {
     setActiveId(id);
     setExportMsg(null);
     const detail = await api.getConversation(id);
+    // Come back exactly where they left off; a conversation they have never
+    // opened starts at the newest message.
+    pendingScroll.current = readScrollMap()[String(id)] ?? BOTTOM;
     setMessages(detail.messages);
   }
 
+  // Apply the queued scroll position after the messages have rendered.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || pendingScroll.current === null) return;
+    el.scrollTop =
+      pendingScroll.current === BOTTOM ? el.scrollHeight : pendingScroll.current;
+    pendingScroll.current = null;
+  }, [messages]);
+
+  function onMessagesScroll() {
+    const el = scrollRef.current;
+    if (!el || !activeId) return;
+    // Throttled: scrolling fires constantly and this touches localStorage.
+    if (scrollSaveTimer.current) clearTimeout(scrollSaveTimer.current);
+    const top = el.scrollTop;
+    scrollSaveTimer.current = setTimeout(() => {
+      const map = readScrollMap();
+      map[String(activeId)] = top;
+      window.localStorage.setItem(SCROLL_KEY, JSON.stringify(map));
+    }, 250);
+  }
+
   function newConversation() {
+    window.localStorage.removeItem(ACTIVE_KEY);
     setActiveId(undefined);
     setMessages([]);
     setExportMsg(null);
+  }
+
+  /** One turn = one request = one model call, whether it carries typed text,
+   *  a batch of answers to clarifying questions, or both. */
+  async function sendTurn(
+    payload: { message?: string; answers?: ClarifyAnswer[] },
+    optimisticId?: number,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.sendMessage({
+        conversation_id: activeId,
+        document_ids: attached,
+        ...payload,
+      });
+      setActiveId(res.conversation_id);
+      setRemaining(res.tokens_remaining);
+      pendingScroll.current = BOTTOM;
+      setMessages((m) => [
+        // Swap the local echo for the message the server actually stored.
+        ...m.filter((x) => x.id !== optimisticId),
+        res.user_message,
+        res.message,
+      ]);
+      if (!activeId) loadConversations();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function send(e: React.FormEvent) {
@@ -61,27 +171,13 @@ export default function ChatPage() {
     if (!input.trim()) return;
     const text = input;
     setInput("");
+    const optimisticId = -Date.now();
+    pendingScroll.current = BOTTOM;
     setMessages((m) => [
       ...m,
-      { id: Date.now(), role: "user", content: text, token_count: 0, created_at: "" },
+      { id: optimisticId, role: "user", content: text, token_count: 0, created_at: "" },
     ]);
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.sendMessage({
-        conversation_id: activeId,
-        message: text,
-        document_ids: attached,
-      });
-      setActiveId(res.conversation_id);
-      setRemaining(res.tokens_remaining);
-      setMessages((m) => [...m, res.message]);
-      if (!activeId) loadConversations();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await sendTurn({ message: text }, optimisticId);
   }
 
   function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -162,25 +258,45 @@ export default function ChatPage() {
         </div>
         {exportMsg && <p className="text-sm text-green-600">{exportMsg}</p>}
 
-        <Card className="flex min-h-[45vh] flex-col gap-3 overflow-y-auto">
+        {/* Its own scroll container, so the position can be restored and new
+            messages don't push the page around. */}
+        <div
+          ref={scrollRef}
+          onScroll={onMessagesScroll}
+          className="flex h-[60vh] flex-col gap-3 overflow-y-auto rounded-xl border border-slate-200/80 bg-white p-6 shadow-soft"
+        >
           {messages.length === 0 && (
             <p className="text-slate-500">{t("chat.emptyPrompt")}</p>
           )}
           {messages.map((m) => (
+            m.content.trim() === "" ? null : (
             <div
               key={m.id}
               className={
                 m.role === "user"
                   ? "max-w-[80%] self-end whitespace-pre-wrap rounded-2xl rounded-br-sm bg-brand px-4 py-2.5 text-sm text-white shadow-soft"
-                  : "max-w-[80%] self-start whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-2.5 text-sm text-slate-800"
+                  : "max-w-[80%] self-start rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-2.5 text-sm text-slate-800"
               }
             >
-              {m.content}
+              {/* The model writes markdown; the user's own text is shown verbatim. */}
+              {m.role === "user" ? m.content : <Markdown text={m.content} />}
             </div>
+            )
           ))}
           {busy && <Spinner label={t("chat.typing")} />}
           {error && <p className="text-sm text-red-600">{error}</p>}
-        </Card>
+        </div>
+
+        {/* Clarifying questions from the latest reply, asked one at a time.
+            Keyed by message id so a new set starts from the first question. */}
+        {pending && (
+          <ClarifyPrompt
+            key={pending.id}
+            questions={pending.questions ?? []}
+            disabled={busy}
+            onSubmit={(answers) => sendTurn({ answers })}
+          />
+        )}
 
         {docs.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs">

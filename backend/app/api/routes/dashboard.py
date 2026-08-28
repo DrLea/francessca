@@ -11,8 +11,8 @@ from app.models.case import Case
 from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.export import Export
-from app.models.timeline_event import TimelineEvent
 from app.models.user import User
+from app.repositories.timeline_repo import TimelineRepository
 from app.schemas.common import DashboardOut, UsageOut
 from app.services.token_service import TokenService
 
@@ -39,7 +39,9 @@ def dashboard(
         .join(Case, Export.case_id == Case.id)
         .where(Case.user_id == user.id)
     ) or 0
-    timeline_count = _count(db, TimelineEvent, user_id=user.id)
+    # Match what the timeline page actually shows: dated calendar
+    # entries only, not rows left over from the old extractor.
+    timeline_count = len(TimelineRepository(db).list_for_user(user.id))
     return DashboardOut(
         conversations=conv_count,
         documents=doc_count,

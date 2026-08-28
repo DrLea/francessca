@@ -3,16 +3,18 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.models.timeline_event import TimelineSourceType
 from app.models.user import User
-from app.repositories.document_repo import CaseRepository
+from app.repositories.conversation_repo import ConversationRepository
+from app.repositories.document_repo import CaseRepository, DocumentRepository
 from app.schemas.case import CaseExportRequest, CaseOut
-from app.schemas.timeline import TimelineEventOut
+from app.schemas.timeline import TimelineEventCreate, TimelineEventOut
 from app.services.case_service import CaseService
 from app.services.export_service import ExportService
 from app.services.templates import CATEGORIES, TEMPLATES, translate_template
@@ -33,11 +35,70 @@ def list_templates(lang: str = "en") -> dict:
 def get_timeline(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> list[TimelineEventOut]:
-    """The auto-extracted, chronological timeline built from every uploaded
-    document and chat message — Francessca's alternative to manually
-    assembling a chronology by hand."""
+    """The auto-extracted calendar: appointments, hearings, deadlines and
+    expiry dates found in the user's documents and chat messages. Every
+    entry carries the document or conversation it came from."""
     events = TimelineService(db).list_for_user(user.id)
-    return [TimelineEventOut.model_validate(e) for e in events]
+
+    doc_ids = [
+        e.source_id
+        for e in events
+        if e.source_type is TimelineSourceType.document and e.source_id
+    ]
+    docs = (
+        {
+            d.id: d.filename
+            for d in DocumentRepository(db).get_many_for_user(doc_ids, user.id)
+        }
+        if doc_ids
+        else {}
+    )
+    convs = (
+        {c.id: c.title for c in ConversationRepository(db).list_for_user(user.id)}
+        if any(e.conversation_id for e in events)
+        else {}
+    )
+
+    items: list[TimelineEventOut] = []
+    for e in events:
+        item = TimelineEventOut.model_validate(e)
+        # A deleted document or conversation simply leaves the entry unlinked.
+        if e.source_type is TimelineSourceType.document:
+            item.source_label = docs.get(e.source_id)
+        elif e.conversation_id:
+            item.source_label = convs.get(e.conversation_id)
+        items.append(item)
+    return items
+
+
+@router.post(
+    "/timeline", response_model=TimelineEventOut, status_code=status.HTTP_201_CREATED
+)
+def create_timeline_event(
+    data: TimelineEventCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TimelineEventOut:
+    """Add an entry by hand — for anything the extractor missed."""
+    event = TimelineService(db).add_manual(
+        user,
+        event_date=data.event_date,
+        description=data.description,
+        is_deadline=data.is_deadline,
+    )
+    return TimelineEventOut.model_validate(event)
+
+
+@router.delete("/timeline/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_timeline_event(
+    event_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Remove one entry the extractor got wrong or the user no longer needs."""
+    if not TimelineService(db).delete_for_user(event_id, user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/summary", response_model=CaseOut)

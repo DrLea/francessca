@@ -16,6 +16,11 @@ COPY . .
 # http://localhost:8000, which is correct for the browser in a local setup.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+# Desktop build URLs. Leave unset and the landing page hides the section
+# rather than offering a dead link.
+ARG NEXT_PUBLIC_DOWNLOAD_WINDOWS
+ARG NEXT_PUBLIC_DOWNLOAD_MAC
+ARG NEXT_PUBLIC_DOWNLOAD_LINUX
 RUN npm run build
 
 # 3. Minimal runtime image serving the standalone server

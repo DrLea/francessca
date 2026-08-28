@@ -19,6 +19,7 @@ from app.api.routes import (
     lawyers,
     me,
     meta,
+    public,
 )
 from app.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -61,5 +62,5 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-for router in (auth, me, chat, files, lawyers, case, dashboard, admin, meta):
+for router in (auth, me, chat, files, lawyers, case, dashboard, admin, meta, public):
     app.include_router(router.router)

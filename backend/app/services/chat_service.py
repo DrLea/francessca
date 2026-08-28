@@ -4,6 +4,11 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.clarify import (
+    CLARIFY_PROTOCOL,
+    parse_questions,
+    render_questions_for_history,
+)
 from app.core.languages import language_instruction
 from app.core.prompts import USER_CONTENT_GUARD
 from app.models.conversation import Conversation
@@ -15,7 +20,7 @@ from app.repositories.conversation_repo import (
     MessageRepository,
 )
 from app.repositories.document_repo import DocumentRepository
-from app.schemas.chat import ChatRequest
+from app.schemas.chat import ChatRequest, ClarifyAnswer
 from app.services.ai_service import AIResult, AIService
 from app.services.prompt_service import PromptService
 from app.services.timeline_service import TimelineService
@@ -23,6 +28,31 @@ from app.services.token_service import TokenService, estimate_tokens
 
 # Keep the prompt context bounded: only send the most recent N turns.
 _MAX_HISTORY = 20
+
+
+def compose_user_text(message: str, answers: list[ClarifyAnswer]) -> str:
+    """Fold answers to clarifying questions into one readable user turn.
+
+    The whole batch travels as a single message, which is what keeps the
+    number of model calls identical to the old free-text flow no matter how
+    many questions were asked.
+    """
+    message = message.strip()
+    if not answers:
+        return message
+
+    lines: list[str] = []
+    for a in answers:
+        answer = (a.answer or "").strip()
+        lines.append(f"- {a.question.strip()}\n  {answer or '(skipped)'}")
+    block = "Answers to your questions:\n" + "\n".join(lines)
+
+    if all(not (a.answer or "").strip() for a in answers):
+        block += (
+            "\n\n(The user skipped these questions. Continue with what you "
+            "already know and do not simply re-ask them.)"
+        )
+    return f"{message}\n\n{block}".strip() if message else block
 
 
 class ChatService:
@@ -62,26 +92,45 @@ class ChatService:
             return ""
         return f"{USER_CONTENT_GUARD}\n\n" + "\n\n".join(chunks)
 
-    def send_message(self, user: User, data: ChatRequest) -> tuple[Conversation, Message]:
-        conv = self._get_or_create_conversation(
-            user, data.conversation_id, data.message
-        )
+    @staticmethod
+    def _history_content(m: Message) -> str:
+        """Replay an assistant turn including the questions it asked.
+
+        Questions live in their own column rather than in `content`, so
+        without this the model would see its own previous turn as if it had
+        asked nothing and would happily ask again.
+        """
+        if m.role is not MessageRole.assistant or not m.questions:
+            return m.content
+        rendered = render_questions_for_history(m.questions)
+        return f"{m.content}\n\n{rendered}".strip() if rendered else m.content
+
+    def send_message(
+        self, user: User, data: ChatRequest
+    ) -> tuple[Conversation, Message, Message]:
+        """Handle one user turn. Returns (conversation, user msg, reply)."""
+        user_text = compose_user_text(data.message, data.answers)
+        conv = self._get_or_create_conversation(user, data.conversation_id, user_text)
 
         history = self.messages.history(conv.id) if conv.id else []
         doc_context = self._build_document_context(user, data.document_ids)
-        system_prompt = self.prompts.active_system_prompt() + language_instruction(
-            user.language
+        system_prompt = (
+            self.prompts.active_system_prompt()
+            + language_instruction(user.language)
+            + CLARIFY_PROTOCOL
         )
 
         # Build the message list for the model (recent history + new turn).
         model_messages: list[dict[str, str]] = []
         for m in history[-_MAX_HISTORY:]:
             if m.role in (MessageRole.user, MessageRole.assistant):
-                model_messages.append({"role": m.role.value, "content": m.content})
+                content = self._history_content(m)
+                if content.strip():
+                    model_messages.append({"role": m.role.value, "content": content})
 
-        user_content = data.message
+        user_content = user_text
         if doc_context:
-            user_content = f"{doc_context}\n\n---\n\nUser message:\n{data.message}"
+            user_content = f"{doc_context}\n\n---\n\nUser message:\n{user_text}"
         model_messages.append({"role": "user", "content": user_content})
 
         # Pre-flight token gate based on an estimate of everything we send.
@@ -94,21 +143,28 @@ class ChatService:
         user_msg = Message(
             conversation_id=conv.id,
             role=MessageRole.user,
-            content=data.message,
-            token_count=estimate_tokens(data.message),
+            content=user_text,
+            token_count=estimate_tokens(user_text),
         )
         self.messages.add(user_msg)
 
-        # Call the model.
+        # Call the model. One call per turn, however many questions came back.
+        # Generous max_tokens: the question block is the LAST thing in the
+        # reply, so a truncated response loses the questions entirely.
         result: AIResult = self.ai.complete(
-            system_prompt=system_prompt, messages=model_messages
+            system_prompt=system_prompt, messages=model_messages, max_tokens=2000
         )
+
+        # Split the reply into what the user sees and what the UI turns into
+        # a one-question-at-a-time flow.
+        text, questions = parse_questions(result.text)
 
         assistant_msg = Message(
             conversation_id=conv.id,
             role=MessageRole.assistant,
-            content=result.text,
+            content=text,
             token_count=result.output_tokens,
+            questions=questions or None,
         )
         self.messages.add(assistant_msg)
 
@@ -122,14 +178,26 @@ class ChatService:
 
         # Best-effort: pull any dated facts out of the user's message into the
         # running case timeline. Never raises — failures are logged and skipped.
+        # The previous assistant turn goes along as context, so "add it to my
+        # timeline" can resolve to the appointment discussed a moment ago.
+        previous = next(
+            (
+                m.content
+                for m in reversed(history)
+                if m.role is MessageRole.assistant and m.content.strip()
+            ),
+            None,
+        )
         self.timeline.extract_from_text(
             user,
-            data.message,
+            user_text,
             source_type=TimelineSourceType.message,
             source_id=user_msg.id,
             conversation_id=conv.id,
+            context=previous,
         )
 
         self.db.commit()
         self.db.refresh(assistant_msg)
-        return conv, assistant_msg
+        self.db.refresh(user_msg)
+        return conv, user_msg, assistant_msg

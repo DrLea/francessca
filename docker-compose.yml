@@ -47,6 +47,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.frontend
+      # NEXT_PUBLIC_* values are inlined into the client bundle at BUILD
+      # time, so they have to be passed here, not only as runtime env.
+      args:
+        NEXT_PUBLIC_API_URL: ${BACKEND_URL:-http://localhost:8000}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        NEXT_PUBLIC_DOWNLOAD_WINDOWS: ${DOWNLOAD_WINDOWS:-}
+        NEXT_PUBLIC_DOWNLOAD_MAC: ${DOWNLOAD_MAC:-}
+        NEXT_PUBLIC_DOWNLOAD_LINUX: ${DOWNLOAD_LINUX:-}
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${BACKEND_URL:-http://localhost:8000}

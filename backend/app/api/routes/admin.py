@@ -9,10 +9,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import require_admin
 from app.models.conversation import Conversation
+from app.models.lawyer_application import ApplicationStatus, LawyerApplication
 from app.models.prompt_version import PromptVersion
 from app.models.token_usage import TokenUsage
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
+from app.repositories.lawyer_repo import LawyerRepository
+from app.schemas.lawyer_application import LawyerApplicationOut
 from app.schemas.user import AdminUserUpdate, UserOut
 from app.seeds.lawyers import sample_lawyers
 from app.services.lawyer_service import LawyerService
@@ -74,6 +77,84 @@ def sync_lawyers(
     if live:
         return service.sync_live(max_pages=max_pages)
     return service.sync_from_parsed(sample_lawyers())
+
+
+# --- Lawyer sign-up applications ----------------------------------------
+@router.get("/lawyer-applications", response_model=list[LawyerApplicationOut])
+def list_lawyer_applications(
+    status_filter: ApplicationStatus | None = None,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[LawyerApplicationOut]:
+    stmt = select(LawyerApplication).order_by(desc(LawyerApplication.created_at))
+    if status_filter is not None:
+        stmt = stmt.where(LawyerApplication.status == status_filter)
+    return [LawyerApplicationOut.model_validate(a) for a in db.scalars(stmt)]
+
+
+def _get_application(db: Session, application_id: int) -> LawyerApplication:
+    application = db.get(LawyerApplication, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if application.status is not ApplicationStatus.pending:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Application already {application.status.value}",
+        )
+    return application
+
+
+@router.post("/lawyer-applications/{application_id}/approve", response_model=LawyerApplicationOut)
+def approve_lawyer_application(
+    application_id: int,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> LawyerApplicationOut:
+    """Publish an application to the directory.
+
+    The new row gets a source_key of its own so a later scraper sync can
+    never overwrite or delete a lawyer who signed up here directly.
+    """
+    application = _get_application(db, application_id)
+    lawyer, _changed = LawyerRepository(db).upsert(
+        {
+            "source_key": f"application:{application.id}",
+            "name": application.name,
+            "law_firm": application.law_firm,
+            "city": application.city,
+            "email": application.email,
+            "phone": application.phone,
+            "website": application.website,
+            "address": application.address,
+            "languages": application.languages,
+            "specializations": [
+                s.strip()
+                for s in (application.specializations or "").split(",")
+                if s.strip()
+            ],
+        }
+    )
+    db.flush()
+    application.status = ApplicationStatus.approved
+    application.lawyer_id = lawyer.id
+    application.reviewed_at = func.now()
+    db.commit()
+    db.refresh(application)
+    return LawyerApplicationOut.model_validate(application)
+
+
+@router.post("/lawyer-applications/{application_id}/reject", response_model=LawyerApplicationOut)
+def reject_lawyer_application(
+    application_id: int,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> LawyerApplicationOut:
+    application = _get_application(db, application_id)
+    application.status = ApplicationStatus.rejected
+    application.reviewed_at = func.now()
+    db.commit()
+    db.refresh(application)
+    return LawyerApplicationOut.model_validate(application)
 
 
 @router.get("/usage")

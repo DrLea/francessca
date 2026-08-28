@@ -62,12 +62,27 @@ export interface Conversation {
   created_at: string;
 }
 
+/** A clarifying question the assistant attached to its reply. The UI always
+ *  appends its own "Other" option with a free-text field, so `choices` never
+ *  contains one (an empty `choices` means: ask as free text). */
+export interface ClarifyQuestion {
+  question: string;
+  choices: string[];
+}
+
+/** One answer going back. `answer: null` means the user skipped it. */
+export interface ClarifyAnswer {
+  question: string;
+  answer: string | null;
+}
+
 export interface Message {
   id: number;
   role: "user" | "assistant" | "system";
   content: string;
   token_count: number;
   created_at: string;
+  questions?: ClarifyQuestion[];
 }
 
 export interface ConversationDetail extends Conversation {
@@ -76,6 +91,8 @@ export interface ConversationDetail extends Conversation {
 
 export interface ChatResponse {
   conversation_id: number;
+  /** The stored user turn — answers are composed into readable text server-side. */
+  user_message: Message;
   message: Message;
   tokens_used: number;
   tokens_remaining: number | null;
@@ -127,20 +144,49 @@ export interface CaseExportResult {
   zip_export_id?: number;
 }
 
+/** One calendar entry: an appointment, hearing, deadline or expiry date.
+ *  Only entries pinned to a real day exist — `event_date` is never null. */
 export interface TimelineEvent {
   id: number;
-  event_date: string | null;
+  event_date: string;
   date_label: string;
   description: string;
   is_deadline: boolean;
   source_type: "document" | "message" | "manual";
+  /** Document id for `document` entries, message id for `message` entries. */
   source_id: number | null;
-  created_at: string;
+  /** Conversation to open, for entries extracted from chat. */
+  conversation_id: number | null;
+  /** Filename or conversation title; null once the source has been deleted. */
+  source_label: string | null;
 }
 
 export interface Language {
   code: string;
   name: string;
+}
+
+/** Directory entry as shown to visitors who aren't signed in — no contact
+ *  details; those stay behind the login on /lawyers. */
+export interface LawyerPreview {
+  id: number;
+  name: string;
+  law_firm: string | null;
+  city: string | null;
+  specializations: string[];
+  languages: string[];
+}
+
+export interface LawyerApplicationInput {
+  name: string;
+  email: string;
+  law_firm?: string;
+  city?: string;
+  phone?: string;
+  website?: string;
+  specializations?: string[];
+  languages?: string[];
+  message?: string;
 }
 
 // ---- API -----------------------------------------------------------------
@@ -172,16 +218,48 @@ export const api = {
 
   languages: () => request<Language[]>("/meta/languages"),
 
+  // --- Public (no auth): the landing page ---------------------------------
+  publicLawyers: (limit = 6) =>
+    request<{ total: number; items: LawyerPreview[] }>(
+      `/public/lawyers?limit=${limit}`,
+    ),
+
+  applyAsLawyer: (body: LawyerApplicationInput) =>
+    request<{ id: number; status: string }>("/public/lawyer-applications", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  // Free while in beta: no payment step, this just moves the tier.
+  changePlan: (tier: "free" | "premium") =>
+    request<User>("/me/plan", { method: "POST", body: JSON.stringify({ tier }) }),
+
   timeline: () => request<TimelineEvent[]>("/case/timeline"),
+
+  createTimelineEvent: (body: {
+    event_date: string;
+    description: string;
+    is_deadline?: boolean;
+  }) =>
+    request<TimelineEvent>("/case/timeline", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  deleteTimelineEvent: (id: number) =>
+    request<void>(`/case/timeline/${id}`, { method: "DELETE" }),
 
   listConversations: () => request<Conversation[]>("/chat"),
 
   getConversation: (id: number) =>
     request<ConversationDetail>(`/chat/${id}`),
 
+  // A whole batch of answers goes back in one request — one model call per
+  // turn, exactly as with a typed message.
   sendMessage: (body: {
     conversation_id?: number;
-    message: string;
+    message?: string;
+    answers?: ClarifyAnswer[];
     document_ids?: number[];
   }) => request<ChatResponse>("/chat", { method: "POST", body: JSON.stringify(body) }),
 

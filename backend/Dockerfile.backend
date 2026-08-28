@@ -21,6 +21,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
+# A Windows checkout can carry CRLF line endings; a CRLF shebang makes the
+# container die with: env: 'bash\r': No such file or directory.
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
+
 # Non-root user
 RUN useradd -m appuser && mkdir -p /data/uploads && chown -R appuser /data /app
 USER appuser

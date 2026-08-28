@@ -99,12 +99,16 @@ export function Textarea({
 export function Card({
   className,
   children,
+  id,
 }: {
   className?: string;
   children: React.ReactNode;
+  /** Optional anchor, so a card can be deep-linked and scrolled to. */
+  id?: string;
 }) {
   return (
     <div
+      id={id}
       className={clsx(
         "rounded-xl border border-slate-200/80 bg-white p-6 shadow-soft",
         className,

@@ -105,7 +105,13 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 | POST | `/auth/login` | Log in |
 | POST | `/auth/google` | Log in / sign up with a Google ID token |
 | GET | `/me` | Current user profile |
-| POST | `/chat` | Send a message (creates conversation if needed) |
+| POST | `/me/plan` | Switch plan (free while in beta — no payment step) |
+| GET | `/public/lawyers` | **No auth.** Contact-free directory preview for the landing page |
+| POST | `/public/lawyer-applications` | **No auth.** A lawyer applies to be listed |
+| GET | `/admin/lawyer-applications` | Review queue (admin) |
+| POST | `/admin/lawyer-applications/{id}/approve` | Publish an application to the directory (admin) |
+| POST | `/admin/lawyer-applications/{id}/reject` | Reject an application (admin) |
+| POST | `/chat` | Send a message and/or a batch of answers to clarifying questions (creates conversation if needed) |
 | GET | `/chat` | List conversations |
 | GET | `/chat/{id}` | Conversation with full message history |
 | POST | `/files` | Upload a document (PDF/image/DOCX/TXT, ≤25 MB; OCR on images) |
@@ -114,21 +120,52 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 | GET | `/lawyers/search` | Search by specialization / city / language |
 | POST | `/case/export` | Generate case summary + PDF (and ZIP of documents) |
 | GET | `/case/export/{id}/download` | Download an export |
-| GET | `/case/timeline` | Auto-extracted, chronological case timeline |
+| GET | `/case/timeline` | Auto-extracted calendar: appointments, deadlines, expiry dates |
+| POST | `/case/timeline` | Add an entry by hand |
+| DELETE | `/case/timeline/{id}` | Remove one timeline entry |
 | GET | `/meta/languages` | Supported UI/chat languages |
 | GET | `/dashboard` | Dashboard counts |
 | GET | `/usage` | Token usage and remaining allowance |
 | `/admin/*` | | User management, token limits, prompt versions, lawyer sync, AI usage (admin only) |
 
+## Guided clarifying questions
+
+Francessca's job is to ask the right questions, but a paragraph full of them gets one answer at best. So when the model needs facts it appends a machine-readable block to its reply instead of asking in prose (the protocol lives in `app/core/clarify.py` and is appended to the mandatory system prompt on every chat turn, alongside the language instruction):
+
+```
+<questions>
+[{"question": "When were you dismissed?", "choices": ["This week", "Earlier"]}]
+</questions>
+```
+
+- The backend strips the block before storing the reply and keeps the parsed questions in `messages.questions` (JSON, migration `0003`), so a reload or a reopened conversation still offers questions that were never answered. Malformed blocks are discarded rather than shown.
+- Caps are enforced server-side: at most 5 questions, 2–5 choices each, deduplicated. Any "Other"/"Not sure" choice the model invents is dropped — the UI always adds its own free-text option.
+- If a reply arrives with questions written as prose instead (`- Do you have it? (Yes / No)`), `parse_prose_questions` converts those lines into real questions and lifts them out of the text, so a model that ignores the protocol still produces the same UI. Chat replies get 2000 output tokens, since a truncated reply would cut the trailing block off.
+- The frontend (`components/ClarifyPrompt.tsx`) asks them **one at a time**, with `Skip` (this question) and `Skip all`, and sends the whole batch back in a single `POST /chat` as `answers: [{question, answer}]` — `answer: null` means skipped.
+- **The model is called exactly as often as before: once per user turn, never once per question.** The answers are composed server-side into one readable user message (visible in the transcript and in the case export), and an all-skipped batch tells the model to move on rather than re-ask.
+
+## Landing page
+
+`/` is a public page, not a redirect: hero with a still of the guided-question flow, how-it-works, a preview of the directory, desktop downloads, plans, and a sign-up form for lawyers. Everything on it works logged out.
+
+- **Directory preview** comes from `GET /public/lawyers`, which returns name, firm, city, specializations and languages only — email, phone and address stay behind the login on `/lawyers`.
+- **Desktop downloads** are read from `NEXT_PUBLIC_DOWNLOAD_WINDOWS` / `_MAC` / `_LINUX` at build time (passed through `docker-compose.yml` build args as `DOWNLOAD_*`). While they are empty the whole section is hidden rather than showing dead links.
+- **Plans** are Free and Premium. `POST /me/plan` moves a user between them with no payment step — Francessca is in beta, so Premium simply lifts the monthly token limit. **Put a payment provider in front of that endpoint before charging anyone.**
+- **Lawyer sign-up** posts to `POST /public/lawyer-applications` and is stored as `pending` in `lawyer_applications` (migration `0004`). Nothing submitted there is visible anywhere until an admin calls `/admin/lawyer-applications/{id}/approve`, which creates the directory entry with a `source_key` of `application:<id>` so a later scraper sync can never overwrite or delete it. Rejected applications are kept for the record and never published.
+
 ## Case timeline
 
-Every uploaded document and chat message is passed through a best-effort AI extraction step (`app/services/timeline_service.py`) that pulls out concrete, dated facts (a termination, a notice, a deadline, a meeting) into a `timeline_events` table — a running chronology the user would otherwise have to assemble by hand. Extraction:
+The timeline is a **calendar, not a chronology**: it holds entries that belong to one specific day — `31.08.2026 appointment at the Ausländerbehörde`, `12.12.2030 passport expires` — and deliberately not narrative facts like "the user was dismissed" or "employed for 1–5 years", which belong in the case summary. Three filters in `app/services/timeline_service.py` enforce that:
 
-- reuses the mandatory Francessca system prompt, so the same no-advice/no-prediction guardrails apply;
-- never invents dates — only events actually stated in the text;
-- never blocks the upload/chat flow — a parsing failure, network error, or exhausted token budget is logged and simply yields zero new events.
+1. **Chat is gated before it costs anything.** A chat message is only sent for extraction when it looks like it mentions a date or something scheduled (any digit, or a scheduling word in one of the eight supported languages). "I was fired yesterday" never reaches the model; "ahh tomorrow I have a meeting" does. Uploaded documents are always scanned.
+2. **The model must classify and date every entry.** It gets today's date (so "tomorrow" and "next Monday" resolve to a real day) and must return `kind` — one of `appointment`, `hearing`, `meeting`, `deadline`, `expiry`, `payment`, `submission` — plus a `YYYY-MM-DD` date.
+3. **Anything else is dropped server-side.** No valid date, or a kind outside that set, and the entry never reaches the database, so a chatty model cannot pollute the calendar. Identical entries (same day, same description) are not filed twice. `deadline`/`expiry`/`payment`/`submission` are flagged as deadlines in the UI.
 
-`GET /case/timeline` returns the chronology (dated events first, undated ones last); it also feeds into case-summary generation (`CaseService`) and is rendered as a dedicated, dated section in the exported PDF (`ExportService`). Because each extraction is a real Claude call, it adds one extra AI request (and its token cost) per document upload and per chat message — for production this is worth moving to a background task/queue so it doesn't add latency to the request path; it currently runs synchronously.
+A chat message is extracted together with the previous assistant turn as context, so "add it to my timeline" resolves to the appointment just discussed; words like *timeline*, *calendar* and *remind* (in all eight languages) always pass the gate. Anything the extractor misses can be added by hand from the timeline page (`POST /case/timeline`, `source_type: manual`).
+
+Every entry keeps the document or conversation it came from (`source_type` + `source_id`/`conversation_id`); `GET /case/timeline` resolves that to a filename or conversation title, and the UI links straight through to `/files?doc=<id>` or `/chat?c=<id>`. Entries the user doesn't want are removable with `DELETE /case/timeline/{id}`.
+
+Only dated entries are returned, which also hides rows left over from the earlier, looser extractor without a data migration. Extraction still reuses the mandatory Francessca system prompt (same no-advice guardrails), never invents dates, and never blocks the upload/chat flow — a parse failure, network error, or exhausted token budget is logged and yields zero entries. The timeline feeds case-summary generation (`CaseService`) and gets its own dated section in the exported PDF (`ExportService`). Each extraction is a real Claude call; for production it's worth moving to a background task so it doesn't add latency to the request path.
 
 ## Multilingual conversation, exports & forms
 
