@@ -135,3 +135,52 @@ def test_a_broken_block_falls_back_to_the_prose_it_contains():
     text, questions = parse_questions(reply)
     assert [q["choices"] for q in questions] == [["Yes", "No"]]
     assert "oops" not in text
+
+
+def test_history_is_trimmed_to_what_the_backend_can_hold(db_session):
+    """A local model's context window is small, and everything shares it.
+    Old turns are dropped rather than letting the reply get squeezed out."""
+    from app.models.conversation import Conversation
+    from app.models.message import Message, MessageRole
+    from app.models.user import User, UserRole, UserTier
+    from app.schemas.chat import ChatRequest
+    from app.services.ai_service import AIResult
+    from app.services.chat_service import ChatService
+
+    user = User(
+        email="ctx@example.com", password_hash="x", role=UserRole.user,
+        tier=UserTier.free, token_limit=1_000_000, tokens_used=0,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    conv = Conversation(user_id=user.id, title="c")
+    db_session.add(conv)
+    db_session.commit()
+    for i in range(12):
+        db_session.add(Message(
+            conversation_id=conv.id,
+            role=MessageRole.user if i % 2 == 0 else MessageRole.assistant,
+            content=f"turn {i} " + "x" * 900,
+        ))
+    db_session.commit()
+
+    class _SmallWindowAI:
+        model = "fake-local"
+        context_char_budget = 4_000
+
+        def __init__(self) -> None:
+            self.sent: list[dict] = []
+
+        def complete(self, *, system_prompt, messages, max_tokens=1024):  # noqa: ANN001
+            self.sent = messages
+            return AIResult(text="ok", input_tokens=1, output_tokens=1, model=self.model)
+
+    ai = _SmallWindowAI()
+    service = ChatService(db_session, ai=ai)
+    service.send_message(user, ChatRequest(conversation_id=conv.id, message="and now?"))
+
+    assert sum(len(m["content"]) for m in ai.sent) <= 4_000
+    # The turn being answered is never the one dropped.
+    assert ai.sent[-1]["content"].endswith("and now?")

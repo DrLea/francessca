@@ -38,6 +38,8 @@ const uk: Record<TranslationKey, string> = {
   "home.lawyersCta": "Переглянути каталог",
   "home.offlineTitle": "Офлайн-версія",
   "home.offlineBody": "Настільна версія для тих, хто воліє тримати документи на власному комп'ютері.",
+  "home.version": "Версія {{version}}",
+  "home.checksums": "Контрольні суми SHA-256 для перевірки завантаженого:",
   "home.download": "Завантажити для {{platform}}",
   "home.pricingTitle": "Тарифи",
   "home.pricingBeta": "Поки Francessca у беті, все безкоштовно — без картки й оплати.",

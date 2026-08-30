@@ -120,3 +120,158 @@ def test_plan_switch_is_free_during_beta(client):
 
 def test_plan_switch_requires_a_login(client):
     assert client.post("/me/plan", json={"tier": "premium"}).status_code == 401
+
+
+def test_local_ai_service_speaks_openai_chat_completions(monkeypatch):
+    """The offline build talks to a llama.cpp server on localhost; nothing
+    about the prompt handling changes, only the wire format."""
+    import httpx
+
+    from app.services.ai_service import LocalAIService
+
+    captured: dict = {}
+
+    class _Resp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "model": "qwen2.5-3b-instruct",
+                "choices": [{"message": {"role": "assistant", "content": "Hallo."}}],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 3},
+            }
+
+    def _fake_post(url, json=None, timeout=None):  # noqa: ANN001
+        captured["url"] = url
+        captured["json"] = json
+        return _Resp()
+
+    monkeypatch.setattr(httpx, "post", _fake_post)
+    service = LocalAIService(base_url="http://127.0.0.1:8757/v1", model="local")
+    result = service.complete(
+        system_prompt="You are Francessca.",
+        messages=[{"role": "user", "content": "Hallo"}],
+        max_tokens=256,
+    )
+
+    assert captured["url"] == "http://127.0.0.1:8757/v1/chat/completions"
+    # The system prompt stays in its own turn, exactly as with the hosted API.
+    assert captured["json"]["messages"][0] == {
+        "role": "system",
+        "content": "You are Francessca.",
+    }
+    assert result.text == "Hallo."
+    assert (result.input_tokens, result.output_tokens) == (11, 3)
+
+
+def test_provider_factory_follows_the_setting(monkeypatch):
+    from app.config import settings
+    from app.services.ai_service import AIService, LocalAIService, build_ai_service
+
+    monkeypatch.setattr(settings, "ai_provider", "local")
+    assert isinstance(build_ai_service(), LocalAIService)
+    monkeypatch.setattr(settings, "ai_provider", "anthropic")
+    assert isinstance(build_ai_service(), AIService)
+
+
+def test_reasoning_models_do_not_leak_their_scratch_work(monkeypatch):
+    """Qwen3 and friends answer with a <think> block first. It must never
+    reach the transcript, the timeline, or the next turn's context."""
+    import httpx
+
+    from app.services.ai_service import LocalAIService, strip_reasoning
+
+    assert strip_reasoning("<think>hmm, dismissal?</think>\n\nI'm sorry.") == "I'm sorry."
+    # Truncated mid-thought: everything from the tag on is scratch work.
+    assert strip_reasoning("Answer.\n<think>still going") == "Answer."
+    assert strip_reasoning("No reasoning here.") == "No reasoning here."
+
+    class _Resp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "model": "qwen3:8b",
+                "choices": [
+                    {
+                        "message": {
+                            "content": "<think>The user was dismissed...</think>\n"
+                            "I'm sorry to hear that."
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 9},
+            }
+
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _Resp())
+    result = LocalAIService().complete(system_prompt="x", messages=[])
+    assert result.text == "I'm sorry to hear that."
+
+
+def test_desktop_downloads_are_runtime_config(client, monkeypatch):
+    """Publishing a new build is a config change plus a restart -- no
+    frontend rebuild, which is what baking the URLs in would have required."""
+    from app.config import settings
+
+    empty = client.get("/public/downloads")
+    assert empty.status_code == 200  # public: a visitor is not signed in
+    assert empty.json() == {"version": None, "items": []}
+
+    monkeypatch.setattr(settings, "download_version", "0.1.0")
+    monkeypatch.setattr(settings, "download_windows", "https://example.com/F.exe ")
+    monkeypatch.setattr(settings, "download_windows_sha256", "abc123")
+    monkeypatch.setattr(settings, "download_linux", "https://example.com/F-linux")
+
+    body = client.get("/public/downloads").json()
+    assert body["version"] == "0.1.0"
+    assert body["items"] == [
+        {
+            "platform": "windows",
+            "url": "https://example.com/F.exe",
+            "sha256": "abc123",
+        },
+        {"platform": "linux", "url": "https://example.com/F-linux", "sha256": None},
+    ]
+
+
+def test_a_locally_hosted_build_is_served_and_hashed(client, tmp_path, monkeypatch):
+    """Self-hosting matters where a third-party CDN is unreachable: the file
+    is offered on the app's own domain, and its checksum is computed here."""
+    import hashlib
+
+    from app.config import settings
+
+    exe = tmp_path / "Francessca.exe"
+    exe.write_bytes(b"MZ fake windows build")
+    monkeypatch.setattr(settings, "download_dir", str(tmp_path))
+    # A configured external URL loses to the local copy.
+    monkeypatch.setattr(settings, "download_windows", "https://example.com/F.exe")
+
+    body = client.get("/public/downloads").json()
+    assert body["items"] == [
+        {
+            "platform": "windows",
+            "url": "/public/download/windows",
+            "sha256": hashlib.sha256(b"MZ fake windows build").hexdigest(),
+        }
+    ]
+
+    got = client.get("/public/download/windows")
+    assert got.status_code == 200
+    assert got.content == b"MZ fake windows build"
+    assert "Francessca.exe" in got.headers["content-disposition"]
+
+
+def test_downloads_reject_anything_but_the_known_platforms(client, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "download_dir", str(tmp_path))
+    # No traversal: the filename never comes from the request.
+    assert client.get("/public/download/..%2F..%2Fetc%2Fpasswd").status_code == 404
+    assert client.get("/public/download/windows").status_code == 404  # nothing published

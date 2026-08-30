@@ -38,6 +38,8 @@ const ru: Record<TranslationKey, string> = {
   "home.lawyersCta": "Открыть каталог",
   "home.offlineTitle": "Офлайн-версия",
   "home.offlineBody": "Настольная версия для тех, кто предпочитает хранить документы на своём компьютере.",
+  "home.version": "Версия {{version}}",
+  "home.checksums": "Контрольные суммы SHA-256 для проверки загруженного:",
   "home.download": "Скачать для {{platform}}",
   "home.pricingTitle": "Тарифы",
   "home.pricingBeta": "Пока Francessca в бете, всё бесплатно — без карты и оплаты.",

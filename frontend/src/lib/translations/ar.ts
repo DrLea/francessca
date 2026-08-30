@@ -38,6 +38,8 @@ const ar: Record<TranslationKey, string> = {
   "home.lawyersCta": "تصفح الدليل",
   "home.offlineTitle": "النسخة دون اتصال",
   "home.offlineBody": "نسخة لسطح المكتب لمن يفضّل الاحتفاظ بمستنداته على جهازه.",
+  "home.version": "الإصدار {{version}}",
+  "home.checksums": "بصمات SHA-256 للتحقق مما نزّلته:",
   "home.download": "التنزيل لنظام {{platform}}",
   "home.pricingTitle": "الخطط",
   "home.pricingBeta": "كل شيء مجاني خلال النسخة التجريبية — بلا بطاقة وبلا دفع.",

@@ -36,6 +36,13 @@ def _ocr_image(content: bytes) -> str | None:
     import pytesseract
     from PIL import Image
 
+    from app.config import settings
+
+    # The desktop build ships its own tesseract; point pytesseract at it
+    # instead of relying on a system-wide install being on PATH.
+    if settings.tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
+
     image = Image.open(io.BytesIO(content))
     # German + English coverage for the target market.
     text = pytesseract.image_to_string(image, lang="deu+eng")

@@ -38,6 +38,8 @@ const de: Record<TranslationKey, string> = {
   "home.lawyersCta": "Verzeichnis ansehen",
   "home.offlineTitle": "Offline-Version",
   "home.offlineBody": "Eine Desktop-Version für alle, die ihre Dokumente lieber auf dem eigenen Rechner behalten.",
+  "home.version": "Version {{version}}",
+  "home.checksums": "SHA-256-Prüfsummen, um den Download zu überprüfen:",
   "home.download": "Für {{platform}} herunterladen",
   "home.pricingTitle": "Tarife",
   "home.pricingBeta": "Während der Beta ist alles kostenlos — keine Karte, keine Zahlung.",

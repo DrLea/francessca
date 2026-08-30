@@ -36,6 +36,8 @@ const en = {
   "home.lawyersCta": "Browse the directory",
   "home.offlineTitle": "Offline version",
   "home.offlineBody": "A desktop build for when you would rather keep your documents on your own machine.",
+  "home.version": "Version {{version}}",
+  "home.checksums": "SHA-256 checksums, to verify what you downloaded:",
   "home.download": "Download for {{platform}}",
   "home.pricingTitle": "Plans",
   "home.pricingBeta": "Everything is free while Francessca is in beta — no card, no payment.",

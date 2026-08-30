@@ -21,7 +21,7 @@ from app.repositories.conversation_repo import (
 )
 from app.repositories.document_repo import DocumentRepository
 from app.schemas.chat import ChatRequest, ClarifyAnswer
-from app.services.ai_service import AIResult, AIService
+from app.services.ai_service import AIResult, AIService, build_ai_service
 from app.services.prompt_service import PromptService
 from app.services.timeline_service import TimelineService
 from app.services.token_service import TokenService, estimate_tokens
@@ -63,7 +63,7 @@ class ChatService:
         self.documents = DocumentRepository(db)
         self.tokens = TokenService(db)
         self.prompts = PromptService(db)
-        self.ai = ai or AIService()
+        self.ai = ai or build_ai_service()
         self.timeline = TimelineService(db, ai=self.ai)
 
     def _get_or_create_conversation(
@@ -84,10 +84,20 @@ class ChatService:
 
     def _build_document_context(self, user: User, document_ids: list[int]) -> str:
         docs = self.documents.get_many_for_user(document_ids, user.id)
+        # Attached documents share the prompt with the conversation, so no
+        # single one may fill it. Half the backend's budget, split between
+        # however many are attached.
+        budget = getattr(self.ai, "context_char_budget", None)
+        per_doc = (budget // 2) // max(1, len(docs)) if budget and docs else None
+
         chunks: list[str] = []
         for d in docs:
-            if d.extracted_text:
-                chunks.append(f"[Document: {d.filename}]\n{d.extracted_text.strip()}")
+            if not d.extracted_text:
+                continue
+            text = d.extracted_text.strip()
+            if per_doc and len(text) > per_doc:
+                text = text[:per_doc] + "\n[... truncated to fit the model's context]"
+            chunks.append(f"[Document: {d.filename}]\n{text}")
         if not chunks:
             return ""
         return f"{USER_CONTENT_GUARD}\n\n" + "\n\n".join(chunks)
@@ -132,6 +142,17 @@ class ChatService:
         if doc_context:
             user_content = f"{doc_context}\n\n---\n\nUser message:\n{user_text}"
         model_messages.append({"role": "user", "content": user_content})
+
+        # Keep the whole prompt inside what this backend can actually hold,
+        # dropping the oldest turns first. The newest turn always survives:
+        # without it there is nothing to answer.
+        budget = getattr(self.ai, "context_char_budget", None)
+        if budget:
+            overhead = len(system_prompt)
+            while len(model_messages) > 1 and (
+                overhead + sum(len(m["content"]) for m in model_messages) > budget
+            ):
+                model_messages.pop(0)
 
         # Pre-flight token gate based on an estimate of everything we send.
         estimated = estimate_tokens(

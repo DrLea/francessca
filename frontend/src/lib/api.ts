@@ -1,7 +1,16 @@
 // Typed API client for the Francessca backend.
 // The JWT is persisted in localStorage and attached to every request.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// The desktop build serves the UI from the API process itself, so requests
+// must be relative. It cannot signal that with an empty NEXT_PUBLIC_API_URL:
+// in PowerShell `$env:X = ""` deletes the variable, and Next then inlines
+// the localhost fallback below. Hence an explicit flag.
+// "/api" rather than "": in the desktop build one process serves both the
+// UI and the API, and pages like /chat and /lawyers exist on both sides.
+const API_URL =
+  process.env.NEXT_PUBLIC_SAME_ORIGIN_API === "1"
+    ? "/api"
+    : process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const TOKEN_KEY = "francessca_token";
 
 export function getToken(): string | null {
@@ -177,6 +186,13 @@ export interface LawyerPreview {
   languages: string[];
 }
 
+export interface DesktopDownload {
+  platform: "windows" | "mac" | "linux";
+  url: string;
+  /** Optional: shown so visitors can verify an unsigned executable. */
+  sha256: string | null;
+}
+
 export interface LawyerApplicationInput {
   name: string;
   email: string;
@@ -222,6 +238,11 @@ export const api = {
   publicLawyers: (limit = 6) =>
     request<{ total: number; items: LawyerPreview[] }>(
       `/public/lawyers?limit=${limit}`,
+    ),
+
+  desktopDownloads: () =>
+    request<{ version: string | null; items: DesktopDownload[] }>(
+      "/public/downloads",
     ),
 
   applyAsLawyer: (body: LawyerApplicationInput) =>
@@ -298,6 +319,8 @@ export const api = {
     });
     if (!res.ok) {
       const detail = await res.json().catch(() => ({ detail: res.statusText }));
+      // 504 carries the "the local model was too slow" explanation; show it
+      // rather than a generic failure.
       throw new ApiError(detail.detail ?? "Translation failed", res.status);
     }
     const blob = await res.blob();

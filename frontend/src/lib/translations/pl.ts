@@ -38,6 +38,8 @@ const pl: Record<TranslationKey, string> = {
   "home.lawyersCta": "Przeglądaj katalog",
   "home.offlineTitle": "Wersja offline",
   "home.offlineBody": "Wersja na komputer dla tych, którzy wolą trzymać dokumenty na własnym dysku.",
+  "home.version": "Wersja {{version}}",
+  "home.checksums": "Sumy kontrolne SHA-256, aby zweryfikować pobrany plik:",
   "home.download": "Pobierz dla {{platform}}",
   "home.pricingTitle": "Plany",
   "home.pricingBeta": "W wersji beta wszystko jest bezpłatne — bez karty i bez płatności.",

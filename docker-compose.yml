@@ -40,8 +40,17 @@ services:
         condition: service_healthy
     volumes:
       - uploads:/data/uploads
+      # Desktop builds to serve from this deployment. Drop Francessca.exe
+      # here and set DOWNLOAD_DIR=/data/downloads; read-only, since the API
+      # only ever streams them out.
+      - ./downloads:/data/downloads:ro
     ports:
       - "8000:8000"
+    # Lets AI_PROVIDER=local reach an Ollama running on the host at
+    # http://host.docker.internal:11434/v1 (already resolvable on Docker
+    # Desktop; this adds it on plain Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:

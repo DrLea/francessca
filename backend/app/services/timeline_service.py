@@ -36,7 +36,7 @@ from app.core.logging import get_logger
 from app.models.timeline_event import TimelineEvent, TimelineSourceType
 from app.models.user import User
 from app.repositories.timeline_repo import TimelineRepository
-from app.services.ai_service import AIService
+from app.services.ai_service import AIService, build_ai_service
 from app.services.prompt_service import PromptService
 from app.services.token_service import TokenService, estimate_tokens
 
@@ -160,7 +160,7 @@ class TimelineService:
         self.events = TimelineRepository(db)
         self.prompts = PromptService(db)
         self.tokens = TokenService(db)
-        self.ai = ai or AIService()
+        self.ai = ai or build_ai_service()
 
     def list_for_user(self, user_id: int) -> list[TimelineEvent]:
         return self.events.list_for_user(user_id)

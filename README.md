@@ -107,6 +107,7 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 | GET | `/me` | Current user profile |
 | POST | `/me/plan` | Switch plan (free while in beta — no payment step) |
 | GET | `/public/lawyers` | **No auth.** Contact-free directory preview for the landing page |
+| GET | `/public/downloads` | **No auth.** Desktop builds on offer, from `DOWNLOAD_*` env |
 | POST | `/public/lawyer-applications` | **No auth.** A lawyer applies to be listed |
 | GET | `/admin/lawyer-applications` | Review queue (admin) |
 | POST | `/admin/lawyer-applications/{id}/approve` | Publish an application to the directory (admin) |
@@ -144,12 +145,33 @@ Francessca's job is to ask the right questions, but a paragraph full of them get
 - The frontend (`components/ClarifyPrompt.tsx`) asks them **one at a time**, with `Skip` (this question) and `Skip all`, and sends the whole batch back in a single `POST /chat` as `answers: [{question, answer}]` — `answer: null` means skipped.
 - **The model is called exactly as often as before: once per user turn, never once per question.** The answers are composed server-side into one readable user message (visible in the transcript and in the case export), and an all-skipped batch tells the model to move on rather than re-ask.
 
+## Offline desktop build
+
+`desktop/` packages the whole application as a single executable that runs
+with no network at all: SQLite instead of Postgres, a bundled llama.cpp
+serving a local GGUF model instead of the Anthropic API, and the statically
+exported frontend served by FastAPI itself — one process, one port.
+
+```
+Francessca.exe
+  ├── llama.cpp server   127.0.0.1:8757
+  └── FastAPI + uvicorn  127.0.0.1:8756   API and UI
+```
+
+The only switch in the shared code is `AI_PROVIDER=local`, which swaps
+`AIService` (Anthropic) for `LocalAIService` (OpenAI-compatible); everything
+else — chat, questions, timeline, exports — is the same code in both builds.
+PyInstaller does not cross-compile, so build the Windows executable on
+Windows (`desktop/build.ps1`) and the Linux one on Linux (`desktop/build.sh`).
+See `desktop/README.md` for prerequisites, the model choice, and how to
+publish the result through the landing page's `DOWNLOAD_*` variables.
+
 ## Landing page
 
 `/` is a public page, not a redirect: hero with a still of the guided-question flow, how-it-works, a preview of the directory, desktop downloads, plans, and a sign-up form for lawyers. Everything on it works logged out.
 
 - **Directory preview** comes from `GET /public/lawyers`, which returns name, firm, city, specializations and languages only — email, phone and address stay behind the login on `/lawyers`.
-- **Desktop downloads** are read from `NEXT_PUBLIC_DOWNLOAD_WINDOWS` / `_MAC` / `_LINUX` at build time (passed through `docker-compose.yml` build args as `DOWNLOAD_*`). While they are empty the whole section is hidden rather than showing dead links.
+- **Desktop downloads** come from `GET /public/downloads`, which reads the `DOWNLOAD_*` variables at request time — publishing a release is an `.env` change plus a backend restart, with no frontend rebuild. Checksums are shown under the buttons when set, since the executables are unsigned. While the variables are empty the whole section is hidden rather than showing dead links.
 - **Plans** are Free and Premium. `POST /me/plan` moves a user between them with no payment step — Francessca is in beta, so Premium simply lifts the monthly token limit. **Put a payment provider in front of that endpoint before charging anyone.**
 - **Lawyer sign-up** posts to `POST /public/lawyer-applications` and is stored as `pending` in `lawyer_applications` (migration `0004`). Nothing submitted there is visible anywhere until an admin calls `/admin/lawyer-applications/{id}/approve`, which creates the directory entry with a `source_key` of `application:<id>` so a later scraper sync can never overwrite or delete it. Rejected applications are kept for the record and never published.
 

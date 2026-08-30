@@ -26,7 +26,7 @@ def test_chat_uses_fake_ai_and_records_tokens(client, db_session, monkeypatch):
     from tests.conftest import FakeAI
 
     monkeypatch.setattr(
-        "app.services.chat_service.AIService", lambda *a, **k: FakeAI()
+        "app.services.chat_service.build_ai_service", lambda *a, **k: FakeAI()
     )
     token = _register(client)
     resp = client.post(
@@ -97,7 +97,7 @@ def test_chat_returns_structured_questions_and_accepts_a_batch_of_answers(
             )
 
     monkeypatch.setattr(
-        "app.services.chat_service.AIService", lambda *a, **k: CountingAI(reply)
+        "app.services.chat_service.build_ai_service", lambda *a, **k: CountingAI(reply)
     )
     token = _register(client, email="questions@example.com")
     headers = {"Authorization": f"Bearer {token}"}
@@ -147,7 +147,7 @@ def test_chat_rejects_an_empty_turn(client, monkeypatch):
     from tests.conftest import FakeAI
 
     monkeypatch.setattr(
-        "app.services.chat_service.AIService", lambda *a, **k: FakeAI()
+        "app.services.chat_service.build_ai_service", lambda *a, **k: FakeAI()
     )
     token = _register(client, email="empty@example.com")
     resp = client.post(

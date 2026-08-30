@@ -2,20 +2,29 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, type LawyerPreview } from "@/lib/api";
+import { api, type DesktopDownload, type LawyerPreview } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { Button, Card, Input } from "@/components/ui";
 
-/** Desktop builds are only offered once the URLs are configured at build
- *  time (NEXT_PUBLIC_DOWNLOAD_*), so the section never shows dead links. */
-const DOWNLOADS = (
+const PLATFORM_LABEL: Record<DesktopDownload["platform"], string> = {
+  windows: "Windows",
+  mac: "macOS",
+  linux: "Linux",
+};
+
+/** Build-time fallback, for a deployment that has no backend reachable yet.
+ *  The live list comes from GET /public/downloads, so publishing a release
+ *  needs no frontend rebuild. */
+const STATIC_DOWNLOADS = (
   [
-    { label: "Windows", url: process.env.NEXT_PUBLIC_DOWNLOAD_WINDOWS },
-    { label: "macOS", url: process.env.NEXT_PUBLIC_DOWNLOAD_MAC },
-    { label: "Linux", url: process.env.NEXT_PUBLIC_DOWNLOAD_LINUX },
-  ] as { label: string; url?: string }[]
-).filter((d): d is { label: string; url: string } => !!d.url);
+    { platform: "windows", url: process.env.NEXT_PUBLIC_DOWNLOAD_WINDOWS },
+    { platform: "mac", url: process.env.NEXT_PUBLIC_DOWNLOAD_MAC },
+    { platform: "linux", url: process.env.NEXT_PUBLIC_DOWNLOAD_LINUX },
+  ] as { platform: DesktopDownload["platform"]; url?: string }[]
+)
+  .filter((d): d is { platform: DesktopDownload["platform"]; url: string } => !!d.url)
+  .map((d) => ({ ...d, sha256: null }));
 
 function Section({
   id,
@@ -123,7 +132,7 @@ function Hero({ lawyerCount }: { lawyerCount: number }) {
             <a href="#lawyers">
               <Button variant="secondary">{t("home.findLawyer")}</Button>
             </a>
-            {DOWNLOADS.length > 0 && (
+            {STATIC_DOWNLOADS.length > 0 && (
               <a href="#offline">
                 <Button variant="ghost">{t("home.offlineTitle")}</Button>
               </a>
@@ -227,18 +236,54 @@ function Lawyers({
 
 function Offline() {
   const { t } = useI18n();
-  if (DOWNLOADS.length === 0) return null;
+  const [downloads, setDownloads] = useState<DesktopDownload[]>(STATIC_DOWNLOADS);
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .desktopDownloads()
+      .then((res) => {
+        if (res.items.length > 0) setDownloads(res.items);
+        setVersion(res.version);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Nothing published yet: no section at all, rather than a dead button.
+  if (downloads.length === 0) return null;
+
   return (
-    <Section id="offline" title={t("home.offlineTitle")} lead={t("home.offlineBody")}>
+    <Section
+      id="offline"
+      title={t("home.offlineTitle")}
+      lead={
+        version
+          ? `${t("home.offlineBody")} ${t("home.version", { version })}`
+          : t("home.offlineBody")
+      }
+    >
       <div className="flex flex-wrap gap-3">
-        {DOWNLOADS.map((d) => (
-          <a key={d.label} href={d.url} download>
+        {downloads.map((d) => (
+          <a key={d.platform} href={d.url} download>
             <Button variant="secondary">
-              {t("home.download", { platform: d.label })}
+              {t("home.download", { platform: PLATFORM_LABEL[d.platform] })}
             </Button>
           </a>
         ))}
       </div>
+      {downloads.some((d) => d.sha256) && (
+        <div className="mt-4 flex flex-col gap-1">
+          <p className="text-xs text-slate-500">{t("home.checksums")}</p>
+          {downloads
+            .filter((d) => d.sha256)
+            .map((d) => (
+              <p key={d.platform} className="font-mono text-[11px] text-slate-400">
+                <span className="text-slate-500">{PLATFORM_LABEL[d.platform]}</span>{" "}
+                <span className="break-all">{d.sha256}</span>
+              </p>
+            ))}
+        </div>
+      )}
     </Section>
   );
 }

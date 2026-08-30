@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import uuid
 from io import BytesIO
 
@@ -23,7 +24,7 @@ from app.models.document import Document
 from app.models.timeline_event import TimelineSourceType
 from app.models.user import User
 from app.repositories.document_repo import DocumentRepository
-from app.services.ai_service import AIService
+from app.services.ai_service import AIService, build_ai_service
 from app.services.export_service import disclaimer_text
 from app.services.ocr_service import extract_text
 from app.services.timeline_service import TimelineService
@@ -41,26 +42,37 @@ def _register_dejavu_fonts() -> None:
     Silently skips if fonts aren't found (fallback to default reporting
     behavior — text may be missing but won't crash).
     """
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-        "/System/Library/Fonts/DejaVuSans.ttf",  # macOS
-        "C:\\Windows\\Fonts\\DejaVuSans.ttf",  # Windows
+    # (regular, bold) pairs, best first. Windows has no DejaVu, so Arial and
+    # Segoe UI stand in: both cover Latin, Cyrillic, Greek, Turkish and
+    # Arabic, which is what the supported languages need. The registered
+    # names stay "DejaVuSans" either way -- they are just keys the export
+    # code asks for.
+    candidates = [
+        (os.path.join(settings.font_dir, "DejaVuSans.ttf"),
+         os.path.join(settings.font_dir, "DejaVuSans-Bold.ttf")) if settings.font_dir
+        else ("", ""),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+         "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+        ("C:\\Windows\\Fonts\\DejaVuSans.ttf", "C:\\Windows\\Fonts\\DejaVuSans-Bold.ttf"),
+        ("C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\arialbd.ttf"),
+        ("C:\\Windows\\Fonts\\segoeui.ttf", "C:\\Windows\\Fonts\\segoeuib.ttf"),
     ]
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("DejaVuSans", path))
-                pdfmetrics.registerFont(
-                    TTFont(
-                        "DejaVuSans-Bold",
-                        path.replace("DejaVuSans.ttf", "DejaVuSans-Bold.ttf"),
-                    )
-                )
-                return
-            except Exception as e:
-                log.debug("font_registration_failed", extra={"path": path, "error": str(e)})
-                continue
-    log.warning("dejavu_fonts_not_found")
+    for regular, bold in candidates:
+        if not regular or not os.path.exists(regular):
+            continue
+        if not os.path.exists(bold):
+            bold = regular  # better a single weight than no Unicode at all
+        try:
+            pdfmetrics.registerFont(TTFont("DejaVuSans", regular))
+            pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold))
+            log.info("pdf_font_registered", extra={"path": regular})
+            return
+        except Exception as e:
+            log.debug("font_registration_failed", extra={"path": regular, "error": str(e)})
+            continue
+    log.warning("no_unicode_font_found: PDF exports will drop non-Latin text")
 
 
 _register_dejavu_fonts()
@@ -77,11 +89,53 @@ ALLOWED_MIMES = {
 }
 
 
+# Translation is done in pieces, not in one call. A whole document in a
+# single request is what a hosted model handles happily and a local one does
+# not: it overruns the context window (leaving no room for the answer) and
+# takes minutes, which then times out. Paragraph-sized chunks keep every
+# call small, fast and well inside any context window.
+TRANSLATION_CHUNK_CHARS = 1200
+MAX_TRANSLATION_CHUNKS = 40
+
+
+def split_for_translation(text: str, budget: int = TRANSLATION_CHUNK_CHARS) -> list[str]:
+    """Split on blank lines, packing paragraphs up to `budget` characters.
+
+    A paragraph longer than the budget on its own is cut at whitespace, so a
+    word is never split down the middle.
+    """
+    chunks: list[str] = []
+    current = ""
+    for paragraph in re.split(r"\n\s*\n", text.strip()):
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        while len(paragraph) > budget:
+            cut = paragraph.rfind(" ", 0, budget)
+            if cut <= 0:
+                cut = budget
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(paragraph[:cut].strip())
+            paragraph = paragraph[cut:].strip()
+        if not current:
+            current = paragraph
+        elif len(current) + len(paragraph) + 2 <= budget:
+            current = f"{current}\n\n{paragraph}"
+        else:
+            chunks.append(current)
+            current = paragraph
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 class FileService:
     def __init__(self, db: Session, ai: AIService | None = None) -> None:
         self.db = db
         self.documents = DocumentRepository(db)
-        self.ai = ai or AIService()
+        self.ai = ai or build_ai_service()
         self.timeline = TimelineService(db, ai=self.ai)
         os.makedirs(settings.upload_dir, exist_ok=True)
 
@@ -178,26 +232,51 @@ class FileService:
 
         lang = normalize_language(lang)
         system_prompt = FRANCESSCA_SYSTEM_PROMPT + translation_instruction(lang)
-        user_content = f"{USER_CONTENT_GUARD}\n\n{source_text}"
-
         tokens = TokenService(self.db)
         source_tokens = estimate_tokens(source_text)
         estimated = estimate_tokens(system_prompt) + source_tokens * 2 + 256
         tokens.ensure_within_limit(user, estimated)
 
-        result = self.ai.complete(
-            system_prompt=system_prompt,
-            messages=[{"role": "user", "content": user_content}],
-            max_tokens=min(8192, source_tokens * 2 + 512),
-        )
+        chunks = split_for_translation(source_text)
+        if len(chunks) > MAX_TRANSLATION_CHUNKS:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=(
+                    "This document is too long to translate in one go. Split it "
+                    "into smaller files and translate them separately."
+                ),
+            )
+
+        translated: list[str] = []
+        total_in = total_out = 0
+        model_used = ""
+        for index, chunk in enumerate(chunks, 1):
+            result = self.ai.complete(
+                system_prompt=system_prompt,
+                messages=[
+                    {"role": "user", "content": f"{USER_CONTENT_GUARD}\n\n{chunk}"}
+                ],
+                # Translations run longer than their source; 3x plus headroom
+                # covers scripts that need more tokens per word than English.
+                max_tokens=min(4096, estimate_tokens(chunk) * 3 + 256),
+            )
+            translated.append(result.text.strip())
+            total_in += result.input_tokens
+            total_out += result.output_tokens
+            model_used = result.model
+            log_event(
+                log, "file_translate_chunk", doc_id=doc_id, chunk=index,
+                of=len(chunks),
+            )
 
         tokens.record(
-            user, input_tokens=result.input_tokens, output_tokens=result.output_tokens,
-            model=result.model,
+            user, input_tokens=total_in, output_tokens=total_out, model=model_used,
         )
         self.db.commit()
 
-        pdf_bytes = _render_translation_pdf(doc.filename, lang, result.text)
+        pdf_bytes = _render_translation_pdf(
+            doc.filename, lang, "\n\n".join(part for part in translated if part)
+        )
         stem = os.path.splitext(doc.filename)[0]
         filename = f"{stem}_{lang}.pdf"
         log_event(log, "file_translate", user_id=user.id, doc_id=doc_id, lang=lang)

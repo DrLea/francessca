@@ -1,26 +1,67 @@
+# ---------------------------------------------------------------------------
+# What git should never see. The rule: anything a build produces, anything a
+# machine generates, anything holding a user's data, and anything secret.
+# ---------------------------------------------------------------------------
+
+# Secrets and local configuration -- the templates stay tracked
+.env
+.env.*
+!.env.template
+!.env.local.example
+*.local
+
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
-*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Env / secrets
-.env
-*.local
-
-# Node / Next
+# Node / Next.js  (package-lock.json IS tracked -- it pins the dependency tree)
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 npm-debug.log*
+yarn-error.log*
 
-# Data / uploads
+# Desktop build: outputs, fetched assets and its build venv.
+# desktop/build.ps1 and build.sh recreate all of this.
+desktop/dist/
+desktop/build/
+desktop/dist-assets/
+desktop/.venv/
+
+# Model weights and packaged binaries -- hundreds of MB, never in git
+*.gguf
+*.exe
+*.dmg
+*.AppImage
+
+# Builds served by this deployment (DOWNLOAD_DIR); keep the folder, not the files
+downloads/*
+!downloads/.gitkeep
+
+# Runtime data: uploads, exports, SQLite databases
 /data/
 backend/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Scratch and logs
+_to_delete/
+tmp/
+*.log
 
 # OS / editor
 .DS_Store
+Thumbs.db
+desktop.ini
 .idea/
 .vscode/

@@ -20,7 +20,7 @@ from app.models.user import User
 from app.repositories.conversation_repo import ConversationRepository, MessageRepository
 from app.repositories.document_repo import CaseRepository, DocumentRepository
 from app.schemas.case import CaseSummary
-from app.services.ai_service import AIService
+from app.services.ai_service import AIService, build_ai_service
 from app.services.prompt_service import PromptService
 from app.services.timeline_service import TimelineService
 from app.services.token_service import TokenService
@@ -46,7 +46,7 @@ class CaseService:
         self.prompts = PromptService(db)
         self.tokens = TokenService(db)
         self.timeline = TimelineService(db)
-        self.ai = ai or AIService()
+        self.ai = ai or build_ai_service()
 
     def generate_summary(
         self, user: User, conversation_id: int, title: str | None

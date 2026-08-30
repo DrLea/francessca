@@ -38,6 +38,8 @@ const tr: Record<TranslationKey, string> = {
   "home.lawyersCta": "Rehbere göz atın",
   "home.offlineTitle": "Çevrimdışı sürüm",
   "home.offlineBody": "Belgelerinizi kendi bilgisayarınızda tutmayı tercih edenler için masaüstü sürümü.",
+  "home.version": "Sürüm {{version}}",
+  "home.checksums": "İndirdiğinizi doğrulamak için SHA-256 sağlama toplamları:",
   "home.download": "{{platform}} için indir",
   "home.pricingTitle": "Planlar",
   "home.pricingBeta": "Francessca beta aşamasındayken her şey ücretsiz — kart yok, ödeme yok.",

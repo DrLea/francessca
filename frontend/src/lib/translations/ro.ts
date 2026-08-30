@@ -38,6 +38,8 @@ const ro: Record<TranslationKey, string> = {
   "home.lawyersCta": "Vezi directorul",
   "home.offlineTitle": "Versiune offline",
   "home.offlineBody": "O versiune desktop pentru cei care preferă să își păstreze documentele pe propriul calculator.",
+  "home.version": "Versiunea {{version}}",
+  "home.checksums": "Sume de control SHA-256, pentru a verifica fișierul descărcat:",
   "home.download": "Descarcă pentru {{platform}}",
   "home.pricingTitle": "Planuri",
   "home.pricingBeta": "Cât timp Francessca este în beta, totul este gratuit — fără card, fără plată.",
