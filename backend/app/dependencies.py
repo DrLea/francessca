@@ -40,3 +40,33 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required"
         )
     return user
+
+
+def require_lawyer(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> "Lawyer":
+    """The signed-in user's own lawyer record (the lawyer portal).
+
+    Returned whether or not the profile has been approved yet — a pending
+    lawyer can already sign in and complete their profile; the routes that
+    need an approved one check `is_published` themselves.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from app.models.lawyer import Lawyer
+
+    if user.role != UserRole.lawyer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Lawyer account required"
+        )
+    lawyer = db.scalar(
+        select(Lawyer)
+        .options(selectinload(Lawyer.specializations))
+        .where(Lawyer.user_id == user.id)
+    )
+    if lawyer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lawyer profile not found"
+        )
+    return lawyer

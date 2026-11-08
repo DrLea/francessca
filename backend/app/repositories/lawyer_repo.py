@@ -29,8 +29,15 @@ class LawyerRepository(BaseRepository[Lawyer]):
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[int, list[Lawyer]]:
-        stmt = select(Lawyer).options(selectinload(Lawyer.specializations))
-        count_stmt = select(func.count(func.distinct(Lawyer.id)))
+        # Self-registered lawyers stay hidden until an admin approves them.
+        stmt = (
+            select(Lawyer)
+            .options(selectinload(Lawyer.specializations))
+            .where(Lawyer.is_published.is_(True))
+        )
+        count_stmt = select(func.count(func.distinct(Lawyer.id))).where(
+            Lawyer.is_published.is_(True)
+        )
 
         if specialization:
             stmt = stmt.join(LawyerSpecialization).where(
@@ -49,7 +56,17 @@ class LawyerRepository(BaseRepository[Lawyer]):
         total = self.db.scalar(count_stmt) or 0
         rows = list(
             self.db.scalars(
-                stmt.distinct().order_by(Lawyer.name).limit(limit).offset(offset)
+                stmt.distinct()
+                .order_by(
+                    # Lawyers reachable through the app first, best rated
+                    # on top. Plain columns only: with DISTINCT, Postgres
+                    # rejects ORDER BY expressions outside the select list.
+                    Lawyer.user_id.desc().nulls_last(),
+                    Lawyer.rating_avg.desc().nulls_last(),
+                    Lawyer.name,
+                )
+                .limit(limit)
+                .offset(offset)
             )
         )
         return total, rows

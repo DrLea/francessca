@@ -20,9 +20,11 @@ from app.api.routes import (
     chat,
     dashboard,
     files,
+    lawyer_portal,
     lawyers,
     me,
     meta,
+    orders,
     public,
 )
 from app.config import settings
@@ -89,7 +91,20 @@ def health() -> dict:
 # process also serves the UI, the whole API moves under /api.
 API_PREFIX = "/api" if settings.frontend_dist else ""
 
-for router in (auth, me, chat, files, lawyers, case, dashboard, admin, meta, public):
+for router in (
+    auth,
+    me,
+    chat,
+    files,
+    lawyers,
+    lawyer_portal,
+    orders,
+    case,
+    dashboard,
+    admin,
+    meta,
+    public,
+):
     app.include_router(router.router, prefix=API_PREFIX)
 
 

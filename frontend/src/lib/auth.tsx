@@ -70,12 +70,36 @@ export function useAuth(): AuthState {
   return ctx;
 }
 
-/** Redirects to /login when no authenticated user is present. */
+/** Where an account lands after signing in: lawyers and clients each have
+ *  their own side of the app. */
+export function homeFor(user: Pick<User, "role">): string {
+  return user.role === "lawyer" ? "/lawyer" : "/dashboard";
+}
+
+/** Guard for the client pages. Redirects to /login when signed out, and
+ *  sends a lawyer account to the lawyer portal — the two sides are kept
+ *  apart. `user` stays null until the guard has passed. */
 export function useRequireAuth() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const allowed = !!user && user.role !== "lawyer";
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
-  return { user, loading };
+    if (loading) return;
+    if (!user) router.replace("/login");
+    else if (!allowed) router.replace("/lawyer");
+  }, [loading, user, allowed, router]);
+  return { user: allowed ? user : null, loading };
+}
+
+/** Guard for the lawyer portal and the admin pages. */
+export function useRequireRole(role: "lawyer" | "admin") {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const allowed = !!user && user.role === role;
+  useEffect(() => {
+    if (loading) return;
+    if (!user) router.replace(role === "lawyer" ? "/lawyer/login" : "/login");
+    else if (!allowed) router.replace(homeFor(user));
+  }, [loading, user, allowed, role, router]);
+  return { user: allowed ? user : null, loading };
 }

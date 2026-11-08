@@ -49,6 +49,11 @@ class LawyerApplication(Base):
     lawyer_id: Mapped[int | None] = mapped_column(
         ForeignKey("lawyers.id", ondelete="SET NULL"), nullable=True
     )
+    # The account that registered, when the lawyer signed up through the
+    # portal (NULL for the older contact-form applications).
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

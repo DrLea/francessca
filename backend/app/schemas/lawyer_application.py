@@ -51,6 +51,8 @@ class LawyerApplicationOut(BaseModel):
     message: str | None
     status: ApplicationStatus
     lawyer_id: int | None
+    # Set when the lawyer registered an account (the lawyer portal).
+    user_id: int | None = None
     reviewed_at: datetime | None
     created_at: datetime
     specializations: list[str] = Field(default_factory=list)

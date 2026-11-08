@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { homeFor, useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { GoogleButton } from "@/components/GoogleButton";
 import { Button, Card, Disclaimer, Input } from "@/components/ui";
@@ -20,7 +21,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) router.replace("/dashboard");
+    // A lawyer who signs in here still lands in their own portal.
+    if (user) router.replace(homeFor(user));
   }, [user, router]);
 
   async function submit(e: React.FormEvent) {
@@ -33,7 +35,6 @@ export default function LoginPage() {
           ? await api.login({ email, password })
           : await api.register({ email, password, full_name: fullName || undefined });
       await signIn(access_token);
-      router.push("/dashboard");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -47,12 +48,11 @@ export default function LoginPage() {
       try {
         const { access_token } = await api.google(idToken);
         await signIn(access_token);
-        router.push("/dashboard");
       } catch (err) {
         setError((err as Error).message);
       }
     },
-    [signIn, router],
+    [signIn],
   );
 
   return (
@@ -101,6 +101,12 @@ export default function LoginPage() {
         >
           {mode === "login" ? t("login.needAccount") : t("login.haveAccount")}
         </button>
+        <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-500">
+          {t("nav.areYouLawyer")}{" "}
+          <Link href="/lawyer/login" className="font-medium text-brand underline">
+            {t("login.lawyerLink")}
+          </Link>
+        </p>
         <Disclaimer />
       </Card>
     </main>

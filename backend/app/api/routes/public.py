@@ -68,10 +68,16 @@ def preview_lawyers(
     """A short, contact-free preview of the directory for the landing page."""
     from sqlalchemy.orm import selectinload
 
-    total = db.scalar(select(func.count()).select_from(Lawyer)) or 0
+    total = (
+        db.scalar(
+            select(func.count()).select_from(Lawyer).where(Lawyer.is_published.is_(True))
+        )
+        or 0
+    )
     rows = db.scalars(
         select(Lawyer)
         .options(selectinload(Lawyer.specializations))
+        .where(Lawyer.is_published.is_(True))
         .order_by(Lawyer.name)
         .limit(limit)
     )

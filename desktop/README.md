@@ -78,7 +78,42 @@ the server's exact pins, so pip can resolve wheels for whichever Python you
 build with). Later builds reuse all of that; add `-SkipFrontend` to skip the
 UI export as well.
 
-### Linux / macOS
+### macOS and Linux, without owning either
+
+`.github/workflows/desktop.yml` builds all four targets on GitHub's runners
+(Windows, macOS arm64, macOS x64, Linux x64) -- free for a public repo, and
+the only practical answer since PyInstaller cannot cross-compile.
+
+```bash
+git tag v0.1.1 && git push origin v0.1.1
+```
+
+Each runner exports the UI, fetches the matching llama.cpp build, packages
+with PyInstaller, writes a `.sha256` next to the binary and attaches both to
+the release. The Actions tab's "Run workflow" button does the same without
+tagging, leaving the binaries as downloadable artifacts for 14 days.
+
+If a llama.cpp asset is missing for a platform, that step is skipped rather
+than failing the build: the app then falls back to Ollama or any other
+OpenAI-compatible server.
+
+**Tesseract is not bundled on macOS or Linux** -- shared-library paths make
+that fragile. The app finds a system install on PATH instead:
+
+```bash
+brew install tesseract tesseract-lang                    # macOS
+sudo apt install tesseract-ocr tesseract-ocr-deu         # Debian/Ubuntu
+```
+
+Without it, everything works except OCR of scanned images.
+
+**Gatekeeper.** An unsigned macOS binary is quarantined: users must
+right-click and choose Open the first time, or run
+`xattr -d com.apple.quarantine Francessca-macos-arm64`. Removing that means
+notarizing with an Apple Developer account (99 USD/year) -- the same class
+of problem as SmartScreen on Windows.
+
+### Building locally on Linux / macOS
 
 ```bash
 cd desktop

@@ -11,7 +11,8 @@ from app.database import Base
 
 
 class UserRole(str, enum.Enum):
-    user = "user"
+    user = "user"  # a client preparing a case
+    lawyer = "lawyer"  # a lawyer with access to the lawyer portal
     admin = "admin"
 
 

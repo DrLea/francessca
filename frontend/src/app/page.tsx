@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { api, type DesktopDownload, type LawyerPreview } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { Button, Card, Input } from "@/components/ui";
+import { InstallApp } from "@/components/InstallApp";
+import { Button, Card } from "@/components/ui";
 
 const PLATFORM_LABEL: Record<DesktopDownload["platform"], string> = {
   windows: "Windows",
@@ -138,6 +139,14 @@ function Hero({ lawyerCount }: { lawyerCount: number }) {
               </a>
             )}
           </div>
+          {!user && (
+            <p className="mt-4 text-sm text-slate-500">
+              {t("nav.areYouLawyer")}{" "}
+              <Link href="/lawyer/register" className="font-medium text-brand underline">
+                {t("home.lawyerJoinLink")}
+              </Link>
+            </p>
+          )}
           <dl className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
             {stats.map((s) => (
               <div key={s.label}>
@@ -380,137 +389,52 @@ function Pricing() {
   );
 }
 
-function LawyerSignup() {
+/** Take it along: install on the phone, with an assistant that also works
+ *  without a connection. */
+function MobileApp() {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    law_firm: "",
-    city: "",
-    phone: "",
-    website: "",
-    specializations: "",
-    languages: "",
-    message: "",
-  });
-
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const list = (value: string) =>
-    value
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSending(true);
-    setError(null);
-    try {
-      await api.applyAsLawyer({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        law_firm: form.law_firm.trim() || undefined,
-        city: form.city.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        website: form.website.trim() || undefined,
-        specializations: list(form.specializations),
-        languages: list(form.languages),
-        message: form.message.trim() || undefined,
-      });
-      setSent(true);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSending(false);
-    }
-  }
-
   return (
-    <Section
-      id="for-lawyers"
-      title={t("home.lawyerSignupTitle")}
-      lead={t("home.lawyerSignupBody")}
-    >
-      {sent ? (
-        <Card>
-          <p className="text-sm text-green-700">{t("home.applicationSent")}</p>
-        </Card>
-      ) : !open ? (
-        <Button variant="secondary" onClick={() => setOpen(true)}>
-          {t("home.lawyerSignupCta")}
-        </Button>
-      ) : (
-        <Card>
-          <form onSubmit={submit} className="flex flex-col gap-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                required
-                value={form.name}
-                onChange={set("name")}
-                placeholder={t("home.fieldName")}
-              />
-              <Input
-                required
-                type="email"
-                value={form.email}
-                onChange={set("email")}
-                placeholder={t("home.fieldEmail")}
-              />
-              <Input
-                value={form.law_firm}
-                onChange={set("law_firm")}
-                placeholder={t("home.fieldFirm")}
-              />
-              <Input
-                value={form.city}
-                onChange={set("city")}
-                placeholder={t("home.fieldCity")}
-              />
-              <Input
-                value={form.phone}
-                onChange={set("phone")}
-                placeholder={t("home.fieldPhone")}
-              />
-              <Input
-                value={form.website}
-                onChange={set("website")}
-                placeholder={t("home.fieldWebsite")}
-              />
-              <Input
-                value={form.specializations}
-                onChange={set("specializations")}
-                placeholder={t("home.fieldSpecializations")}
-              />
-              <Input
-                value={form.languages}
-                onChange={set("languages")}
-                placeholder={t("home.fieldLanguages")}
-              />
-            </div>
-            <Input
-              value={form.message}
-              onChange={set("message")}
-              placeholder={t("home.fieldMessage")}
-            />
-            <p className="text-xs text-slate-400">{t("home.reviewNote")}</p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={sending}>
-                {sending ? t("home.submitting") : t("home.submitApplication")}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                {t("timeline.cancel")}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
+    <Section id="app" title={t("app.title")} lead={t("app.body")}>
+      <InstallApp />
+    </Section>
+  );
+}
+
+/** The lawyers' door. They get an account and a portal of their own. */
+function ForLawyers() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const points = [t("lp.auth.point1"), t("lp.auth.point2"), t("lp.auth.point3")];
+  return (
+    <Section id="for-lawyers" title={t("home.lawyerSignupTitle")} lead={t("lp.auth.heroBody")}>
+      <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+        <ul className="flex flex-col gap-2 text-sm text-slate-200">
+          {points.map((p) => (
+            <li key={p} className="flex gap-2">
+              <span aria-hidden className="text-brand-300">
+                ✓
+              </span>
+              {p}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          {user?.role === "lawyer" ? (
+            <Link href="/lawyer">
+              <Button>{t("nav.lawyerPortal")}</Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/lawyer/register">
+                <Button>{t("lp.auth.registerCta")}</Button>
+              </Link>
+              <Link href="/lawyer/login" className="text-sm text-slate-300 underline">
+                {t("lp.auth.haveAccount")}
+              </Link>
+            </>
+          )}
+        </div>
+      </Card>
     </Section>
   );
 }
@@ -532,9 +456,10 @@ export default function HomePage() {
       <Hero lawyerCount={lawyers.total} />
       <Steps />
       <Lawyers items={lawyers.items} total={lawyers.total} />
+      <MobileApp />
       <Offline />
       <Pricing />
-      <LawyerSignup />
+      <ForLawyers />
       <footer className="border-t border-slate-200/70 py-8 text-xs leading-relaxed text-slate-400">
         {t("common.disclaimer")}
       </footer>

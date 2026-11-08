@@ -22,6 +22,14 @@ class LawyerOut(BaseModel):
     languages: list[str] = Field(default_factory=list)
     specializations: list[str] = Field(default_factory=list)
     last_synced_at: datetime | None = None
+    bio: str | None = None
+    years_experience: int | None = None
+    consultation_fee: str | None = None
+    office_hours: str | None = None
+    rating_avg: float | None = None
+    rating_count: int = 0
+    # True when the lawyer has an account, so a case can be sent in-app.
+    accepts_requests: bool = False
 
     @field_validator("languages", mode="before")
     @classmethod

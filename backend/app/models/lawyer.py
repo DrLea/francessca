@@ -3,7 +3,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    true,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -27,6 +38,31 @@ class Lawyer(Base):
     profile_url: Mapped[str | None] = mapped_column(String(512))
     languages: Mapped[str | None] = mapped_column(String(255))  # comma-separated
 
+    # --- Lawyers who registered an account (the lawyer portal) ---------
+    # NULL for directory rows that came from the scraper or the seed data.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
+    # A self-registered lawyer stays out of the directory until an admin
+    # approves them. Scraped rows are published from the start.
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False, index=True
+    )
+    bio: Mapped[str | None] = mapped_column(Text)
+    years_experience: Mapped[int | None] = mapped_column(Integer)
+    consultation_fee: Mapped[str | None] = mapped_column(String(128))
+    office_hours: Mapped[str | None] = mapped_column(String(255))
+    # Orders an admin has unlocked on top of the free allowance.
+    extra_orders: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    # Denormalised from lawyer_reviews so the directory can show and sort
+    # by rating without a join.
+    rating_avg: Mapped[float | None] = mapped_column(Float)
+    rating_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+
     content_hash: Mapped[str | None] = mapped_column(String(64))  # change detection
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
@@ -36,6 +72,11 @@ class Lawyer(Base):
     specializations: Mapped[list["LawyerSpecialization"]] = relationship(
         back_populates="lawyer", cascade="all, delete-orphan"
     )
+
+    @property
+    def accepts_requests(self) -> bool:
+        """Only a lawyer with an account can receive a case through the app."""
+        return self.user_id is not None and self.is_published
 
 
 class LawyerSpecialization(Base):

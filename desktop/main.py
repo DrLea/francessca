@@ -274,7 +274,44 @@ def prepare_database() -> None:
     from app.database import Base, engine
 
     Base.metadata.create_all(engine)
+    add_missing_columns(engine, Base.metadata)
     bootstrap()
+
+
+def add_missing_columns(engine, metadata) -> None:
+    """Bring a database from an older build up to the current models.
+
+    create_all() adds new tables but never touches an existing one, so a
+    column added to a model since the user's database was created would be
+    missing — and every query on that table would fail. Adding columns is
+    all an upgrade has needed so far, and SQLite can do that in place.
+    """
+    from sqlalchemy import inspect, text
+    from sqlalchemy.schema import CreateColumn
+
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {col["name"] for col in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                ddl = str(CreateColumn(column).compile(dialect=engine.dialect))
+                # SQLite cannot add a UNIQUE column; the app enforces it.
+                ddl = ddl.replace(" UNIQUE", "")
+                try:
+                    # A savepoint, so one column SQLite refuses (it cannot
+                    # add e.g. a NOT NULL column without a constant default)
+                    # does not undo the ones that worked.
+                    with conn.begin_nested():
+                        conn.execute(
+                            text(f'ALTER TABLE "{table.name}" ADD COLUMN {ddl}')
+                        )
+                    print(f"Database upgraded: added {table.name}.{column.name}")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Could not add {table.name}.{column.name}: {exc}")
 
 
 def main() -> int:

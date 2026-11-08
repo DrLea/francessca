@@ -161,8 +161,11 @@ Francessca.exe
 The only switch in the shared code is `AI_PROVIDER=local`, which swaps
 `AIService` (Anthropic) for `LocalAIService` (OpenAI-compatible); everything
 else — chat, questions, timeline, exports — is the same code in both builds.
-PyInstaller does not cross-compile, so build the Windows executable on
-Windows (`desktop/build.ps1`) and the Linux one on Linux (`desktop/build.sh`).
+PyInstaller does not cross-compile, so each binary is built on its own OS:
+locally with `desktop/build.ps1` (Windows) or `desktop/build.sh` (Linux and
+macOS), or for all four targets at once by pushing a `v*` tag, which runs
+`.github/workflows/desktop.yml` on GitHub's Windows, macOS and Linux runners
+and attaches the binaries and their checksums to the release.
 See `desktop/README.md` for prerequisites, the model choice, and how to
 publish the result through the landing page's `DOWNLOAD_*` variables.
 
@@ -206,6 +209,22 @@ Every user has a monthly token allowance (`token_limit`; free tier defaults to `
 ## Lawyer directory & scraper
 
 Source: <https://www.rak-muenchen.de/anwaltsverzeichnis/>. The scraper (`app/scraper/rak_muenchen.py`) is polite (rate-limited, identifies itself), caches fetched pages in Redis, and computes a `content_hash` per profile so unchanged records are skipped on re-sync. Trigger a sync via `POST /admin/lawyers/sync` (`live=false` reseeds the bundled sample dataset; `live=true` runs the real crawl). A sample dataset is seeded on first startup so search works immediately.
+
+## Lawyer portal, orders & admin
+
+Lawyers and clients sign in through separate doors and get separate sides of the app.
+
+- **Lawyers** register at `/lawyer/register` (name, email, password, city) and can sign in at once (`/lawyer/login`). The profile stays out of the directory until an admin approves it. The portal at `/lawyer` has orders, closed deals, statistics, finance, a detailed profile editor and a feedback button.
+- **Orders**: a client opens `/lawyers`, picks a lawyer who has an account and sends a prepared case (`POST /orders`). The lawyer sees the summary and a lead quality score (0-100, a heuristic in `services/lead_quality.py`, no model call); the client's name and email are revealed only on accept. Clients follow their requests at `/requests` and can rate the lawyer once the order is closed.
+- **Free allowance**: accepting uses one order. The first `LAWYER_FREE_ORDERS` (default 3) are free; after that the lawyer sees a "contact us" screen (`SUPPORT_EMAIL`) and an admin unlocks more under `/admin/lawyers`. No payment provider is wired in.
+- **Admin** (`/admin`, admin accounts only): overview of everything, lawyer approvals plus order allowances (`/admin/lawyers`), and lawyer feedback with internal notes (`/admin/feedback`).
+- **Email**: sign-ups, approvals, new orders, responses and feedback are mailed when `SMTP_HOST` is set; otherwise they are only logged.
+
+Migration `0005_lawyer_portal` adds all of this: run `alembic upgrade head`.
+
+## Installable app & offline assistant
+
+The frontend is a PWA (`public/manifest.webmanifest`, `public/sw.js`, production builds only): on a phone it installs to the home screen, on a computer as a windowed desktop app. `/offline` runs a small model in the browser through WebLLM/WebGPU (`@mlc-ai/web-llm` — run `npm install` after pulling). The weights (about 400 MB or 1 GB) download once from the WebLLM model host and are cached by the browser; chats there stay in the browser's local storage until the user sends them to their account.
 
 ## Security
 

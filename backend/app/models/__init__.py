@@ -13,8 +13,20 @@ from app.models.lawyer_application import (  # noqa: F401
     ApplicationStatus,
     LawyerApplication,
 )
+from app.models.order import (  # noqa: F401
+    FeedbackStatus,
+    LawyerFeedback,
+    LawyerReview,
+    Order,
+    OrderStatus,
+)
 
 __all__ = [
+    "Order",
+    "OrderStatus",
+    "LawyerFeedback",
+    "FeedbackStatus",
+    "LawyerReview",
     "User",
     "UserRole",
     "UserTier",

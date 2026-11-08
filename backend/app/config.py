@@ -67,6 +67,12 @@ class Settings(BaseSettings):
 
     # App behaviour
     free_tier_token_limit: int = Field(100_000, alias="FREE_TIER_TOKEN_LIMIT")
+    # How many orders a newly registered lawyer can accept for free. After
+    # that they see a "contact us" screen until an admin unlocks more.
+    lawyer_free_orders: int = Field(3, alias="LAWYER_FREE_ORDERS")
+    # Shown on that screen, and where lawyer sign-ups / feedback are mailed.
+    # Falls back to ADMIN_EMAIL.
+    support_email: str = Field("", alias="SUPPORT_EMAIL")
     admin_email: str = Field("", alias="ADMIN_EMAIL")
     admin_password: str = Field("", alias="ADMIN_PASSWORD")
     max_upload_size: int = Field(26_214_400, alias="MAX_UPLOAD_SIZE")
@@ -105,6 +111,10 @@ class Settings(BaseSettings):
     tesseract_cmd: str = Field("", alias="TESSERACT_CMD")
     # Directory holding DejaVuSans.ttf / DejaVuSans-Bold.ttf for PDF export.
     font_dir: str = Field("", alias="FONT_DIR")
+
+    @property
+    def contact_email(self) -> str:
+        return (self.support_email or self.admin_email).strip()
 
     @property
     def is_local_ai(self) -> bool:

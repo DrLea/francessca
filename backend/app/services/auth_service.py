@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.logging import get_logger, log_event
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import User, UserTier
+from app.models.user import User, UserRole, UserTier
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import GoogleAuthRequest, LoginRequest, RegisterRequest
+from app.schemas.portal import LawyerRegisterRequest
 
 log = get_logger("francessca.auth")
 
@@ -41,6 +42,71 @@ class AuthService:
         self.users.add(user)
         self.users.commit()
         log_event(log, "auth_register", user_id=user.id, email=user.email)
+        return user
+
+    def register_lawyer(self, data: LawyerRegisterRequest) -> User:
+        """Create a lawyer account in one step.
+
+        The account works immediately (the lawyer can sign in and complete
+        their profile), but the directory entry is created unpublished and
+        the application waits for an admin, exactly like the older
+        contact-form applications.
+        """
+        from app.models.lawyer import Lawyer, LawyerSpecialization
+        from app.models.lawyer_application import LawyerApplication
+
+        if self.users.get_by_email(data.email):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            )
+        email = data.email.lower()
+        name = data.name.strip()
+        user = User(
+            email=email,
+            password_hash=hash_password(data.password),
+            full_name=name,
+            language=data.language,
+            role=UserRole.lawyer,
+            tier=UserTier.free,
+            token_limit=self._default_limit(),
+        )
+        self.users.add(user)  # flushes, so user.id is available
+
+        languages = ", ".join(data.languages) or None
+        # De-duplicate case-insensitively: (lawyer_id, name) is unique.
+        specs: dict[str, str] = {}
+        for spec in data.specializations:
+            specs.setdefault(spec.lower(), spec)
+        lawyer = Lawyer(
+            # A source_key of its own, so a scraper sync never touches it.
+            source_key=f"account:{user.id}",
+            user_id=user.id,
+            is_published=False,
+            name=name,
+            email=email,
+            law_firm=data.law_firm,
+            city=data.city,
+            phone=data.phone,
+            languages=languages,
+        )
+        lawyer.specializations = [LawyerSpecialization(name=n) for n in specs.values()]
+        self.db.add(lawyer)
+        self.db.flush()
+        self.db.add(
+            LawyerApplication(
+                name=name,
+                email=email,
+                law_firm=data.law_firm,
+                city=data.city,
+                phone=data.phone,
+                languages=languages,
+                specializations=", ".join(specs.values()) or None,
+                lawyer_id=lawyer.id,
+                user_id=user.id,
+            )
+        )
+        self.users.commit()
+        log_event(log, "auth_register_lawyer", user_id=user.id, lawyer_id=lawyer.id)
         return user
 
     def login(self, data: LoginRequest) -> User:

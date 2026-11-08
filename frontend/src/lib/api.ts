@@ -59,7 +59,7 @@ export interface User {
   email: string;
   full_name: string | null;
   language: string;
-  role: "user" | "admin";
+  role: "user" | "lawyer" | "admin";
   tier: "free" | "premium";
   token_limit: number | null;
   tokens_used: number;
@@ -128,6 +128,14 @@ export interface Lawyer {
   photo_url: string | null;
   specializations: string[];
   languages: string[];
+  bio?: string | null;
+  years_experience?: number | null;
+  consultation_fee?: string | null;
+  office_hours?: string | null;
+  rating_avg?: number | null;
+  rating_count?: number;
+  /** The lawyer has an account, so a case can be sent to them in-app. */
+  accepts_requests?: boolean;
 }
 
 export interface DashboardData {
@@ -203,6 +211,231 @@ export interface LawyerApplicationInput {
   specializations?: string[];
   languages?: string[];
   message?: string;
+}
+
+// ---- Lawyer portal, orders, admin -----------------------------------------
+export type OrderStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "cancelled"
+  | "closed_won"
+  | "closed_lost";
+
+export interface Review {
+  id: number;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface CaseItem {
+  id: number;
+  title: string;
+  case_type: string | null;
+  created_at: string;
+}
+
+/** An order as the client who sent it sees it. */
+export interface ClientOrder {
+  id: number;
+  status: OrderStatus;
+  lawyer: {
+    id: number;
+    name: string;
+    law_firm: string | null;
+    city: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+  case_title: string | null;
+  message: string | null;
+  quality_score: number;
+  created_at: string;
+  responded_at: string | null;
+  closed_at: string | null;
+  review: Review | null;
+  can_review: boolean;
+}
+
+/** An order as the lawyer sees it. `client` is null until accepted. */
+export interface LawyerOrder {
+  id: number;
+  status: OrderStatus;
+  case_title: string | null;
+  case_type: string | null;
+  case_summary: Record<string, unknown>;
+  message: string | null;
+  quality_score: number;
+  quality_breakdown: Record<string, number>;
+  is_free: boolean;
+  deal_value: number | null;
+  created_at: string;
+  responded_at: string | null;
+  closed_at: string | null;
+  client: { name: string | null; email: string; language: string } | null;
+  review: Review | null;
+}
+
+export interface LawyerProfile {
+  id: number;
+  name: string;
+  law_firm: string | null;
+  city: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address: string | null;
+  photo_url: string | null;
+  bio: string | null;
+  years_experience: number | null;
+  consultation_fee: string | null;
+  office_hours: string | null;
+  is_published: boolean;
+  rating_avg: number | null;
+  rating_count: number;
+  languages: string[];
+  specializations: string[];
+}
+
+export interface LawyerQuota {
+  free_total: number;
+  extra: number;
+  used: number;
+  remaining: number;
+  free_remaining: number;
+  contact_email: string | null;
+}
+
+export interface LawyerMe {
+  approval: "pending" | "approved" | "rejected";
+  profile: LawyerProfile;
+  quota: LawyerQuota;
+  profile_completeness: number;
+}
+
+export type LawyerProfileInput = Partial<
+  Omit<LawyerProfile, "id" | "is_published" | "rating_avg" | "rating_count">
+>;
+
+export interface LawyerStats {
+  orders: {
+    received: number;
+    pending: number;
+    accepted: number;
+    declined: number;
+    in_progress: number;
+    won: number;
+    lost: number;
+  };
+  rates: {
+    acceptance: number | null;
+    win: number | null;
+    avg_response_hours: number | null;
+    avg_lead_quality: number | null;
+  };
+  rating: { average: number | null; count: number };
+  finance: {
+    revenue: number;
+    deals: number;
+    avg_deal: number | null;
+    free_orders_used: number;
+    paid_orders_used: number;
+    platform_fees: number;
+  };
+  monthly: {
+    month: string;
+    received: number;
+    accepted: number;
+    won: number;
+    revenue: number;
+  }[];
+}
+
+export type FeedbackCategory = "lead_quality" | "platform" | "bug" | "idea" | "other";
+
+export interface Feedback {
+  id: number;
+  lawyer_id: number;
+  order_id: number | null;
+  category: FeedbackCategory;
+  rating: number | null;
+  comment: string;
+  status: "new" | "reviewed";
+  admin_note: string | null;
+  created_at: string;
+}
+
+export interface AdminFeedback extends Feedback {
+  lawyer_name: string;
+  lawyer_city: string | null;
+  order_quality_score: number | null;
+  order_case_title: string | null;
+}
+
+export interface LawyerApplication {
+  id: number;
+  name: string;
+  email: string;
+  law_firm: string | null;
+  city: string | null;
+  phone: string | null;
+  website: string | null;
+  message: string | null;
+  status: "pending" | "approved" | "rejected";
+  lawyer_id: number | null;
+  user_id: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+  specializations: string[];
+  languages: string[];
+}
+
+export interface LawyerAccount {
+  id: number;
+  name: string;
+  email: string | null;
+  city: string | null;
+  law_firm: string | null;
+  is_published: boolean;
+  rating_avg: number | null;
+  rating_count: number;
+  orders_used: number;
+  free_total: number;
+  extra_orders: number;
+  orders_remaining: number;
+  created_at: string;
+}
+
+export interface AdminOverview {
+  users: { clients: number; lawyers: number; admins: number };
+  lawyers: { directory: number; registered: number; live: number; pending_approval: number };
+  orders: Record<OrderStatus, number> & {
+    total: number;
+    accepted_total: number;
+    avg_quality: number | null;
+    reported_revenue: number;
+  };
+  feedback: { new: number; total: number };
+  reviews: { total: number; average: number | null };
+  activity: { conversations: number; cases: number; tokens: number };
+  recent_orders: {
+    id: number;
+    status: OrderStatus;
+    lawyer: string | null;
+    client: string | null;
+    case_title: string | null;
+    quality_score: number;
+    deal_value: number | null;
+    created_at: string;
+  }[];
+  recent_users: {
+    id: number;
+    email: string;
+    full_name: string | null;
+    role: User["role"];
+    created_at: string;
+  }[];
 }
 
 // ---- API -----------------------------------------------------------------
@@ -367,6 +600,120 @@ export const api = {
     a.click();
     window.URL.revokeObjectURL(url);
   },
+
+  // --- Client: send a case to a lawyer, follow it, review -----------------
+  listCases: () => request<CaseItem[]>("/case"),
+
+  sendCase: (body: {
+    lawyer_id: number;
+    case_id?: number;
+    conversation_id?: number;
+    message?: string;
+  }) => request<ClientOrder>("/orders", { method: "POST", body: JSON.stringify(body) }),
+
+  myOrders: () => request<ClientOrder[]>("/orders"),
+
+  cancelOrder: (id: number) =>
+    request<ClientOrder>(`/orders/${id}/cancel`, { method: "POST" }),
+
+  reviewOrder: (id: number, body: { rating: number; comment?: string }) =>
+    request<ClientOrder>(`/orders/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  // --- Lawyer portal --------------------------------------------------------
+  registerLawyer: (body: {
+    email: string;
+    password: string;
+    name: string;
+    city?: string;
+    law_firm?: string;
+    specializations?: string[];
+    languages?: string[];
+    language?: string;
+  }) =>
+    request<{ access_token: string }>("/auth/register-lawyer", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  lawyerMe: () => request<LawyerMe>("/lawyer/me"),
+
+  updateLawyerProfile: (body: LawyerProfileInput) =>
+    request<LawyerMe>("/lawyer/profile", { method: "PUT", body: JSON.stringify(body) }),
+
+  lawyerOrders: () => request<LawyerOrder[]>("/lawyer/orders"),
+
+  acceptOrder: (id: number) =>
+    request<LawyerOrder>(`/lawyer/orders/${id}/accept`, { method: "POST" }),
+
+  declineOrder: (id: number) =>
+    request<LawyerOrder>(`/lawyer/orders/${id}/decline`, { method: "POST" }),
+
+  closeOrder: (id: number, body: { outcome: "won" | "lost"; deal_value?: number }) =>
+    request<LawyerOrder>(`/lawyer/orders/${id}/close`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  lawyerStats: () => request<LawyerStats>("/lawyer/stats"),
+
+  lawyerFeedback: () => request<Feedback[]>("/lawyer/feedback"),
+
+  sendFeedback: (body: {
+    category: FeedbackCategory;
+    comment: string;
+    rating?: number;
+    order_id?: number;
+  }) => request<Feedback>("/lawyer/feedback", { method: "POST", body: JSON.stringify(body) }),
+
+  // --- Admin ----------------------------------------------------------------
+  adminOverview: () => request<AdminOverview>("/admin/overview"),
+
+  adminApplications: (status?: LawyerApplication["status"]) =>
+    request<LawyerApplication[]>(
+      `/admin/lawyer-applications${status ? `?status_filter=${status}` : ""}`,
+    ),
+
+  adminDecideApplication: (id: number, decision: "approve" | "reject") =>
+    request<LawyerApplication>(`/admin/lawyer-applications/${id}/${decision}`, {
+      method: "POST",
+    }),
+
+  adminLawyerAccounts: () => request<LawyerAccount[]>("/admin/lawyer-accounts"),
+
+  adminUpdateLawyerAccount: (
+    id: number,
+    body: { extra_orders?: number; is_published?: boolean },
+  ) =>
+    request<LawyerAccount>(`/admin/lawyer-accounts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  adminFeedback: (params: { status?: "new" | "reviewed"; category?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status_filter", params.status);
+    if (params.category) qs.set("category", params.category);
+    return request<{
+      items: AdminFeedback[];
+      summary: {
+        new: number;
+        total: number;
+        by_category: Record<string, { count: number; avg_rating: number | null }>;
+      };
+    }>(`/admin/feedback?${qs.toString()}`);
+  },
+
+  adminUpdateFeedback: (
+    id: number,
+    body: { status?: "new" | "reviewed"; admin_note?: string },
+  ) =>
+    request<AdminFeedback>(`/admin/feedback/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 
   dashboard: () => request<DashboardData>("/dashboard"),
   usage: () => request<UsageData>("/usage"),

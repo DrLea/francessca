@@ -1,0 +1,139 @@
+# Builds the offline desktop app for Windows, macOS (Intel + Apple Silicon)
+# and Linux, and attaches them to the release.
+#
+# PyInstaller cannot cross-compile, so each binary is built on its own
+# runner -- which is the point: no Mac or Linux machine needed.
+#
+# Trigger it by pushing a tag:
+#     git tag v0.1.1 && git push origin v0.1.1
+# or from the Actions tab ("Run workflow") to get artifacts without a release.
+
+name: Desktop builds
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # to attach the binaries to the release
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x64
+            built: Francessca.exe
+            asset: Francessca-windows-x64.exe
+            llama: bin-win-cpu-x64
+          - os: macos-latest
+            label: macos-arm64
+            built: Francessca
+            asset: Francessca-macos-arm64
+            llama: bin-macos-arm64
+          - os: macos-13
+            label: macos-x64
+            built: Francessca
+            asset: Francessca-macos-x64
+            llama: bin-macos-x64
+          - os: ubuntu-latest
+            label: linux-x64
+            built: Francessca
+            asset: Francessca-linux-x64
+            llama: bin-ubuntu-x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 3.12, not the newest: PyInstaller and the compiled dependencies need
+      # wheels published for the exact version.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Export the frontend
+        working-directory: frontend
+        env:
+          DESKTOP_BUILD: "1"
+          NEXT_PUBLIC_SAME_ORIGIN_API: "1"
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage the exported UI
+        shell: bash
+        run: |
+          mkdir -p desktop/dist-assets
+          rm -rf desktop/dist-assets/frontend
+          cp -r frontend/out desktop/dist-assets/frontend
+
+      # Optional: the app falls back to Ollama when this is missing, so a
+      # failure here must not fail the build.
+      - name: Bundle llama.cpp
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p desktop/dist-assets/llama
+          url=$(gh api repos/ggml-org/llama.cpp/releases/latest \
+            --jq ".assets[] | select(.name | test(\"${{ matrix.llama }}.*\\\\.zip$\")) | .browser_download_url" \
+            | head -1)
+          if [ -z "$url" ]; then
+            echo "No ${{ matrix.llama }} asset in the latest release; skipping."
+            exit 0
+          fi
+          echo "Fetching $url"
+          curl -fL "$url" -o /tmp/llama.zip
+          unzip -qo /tmp/llama.zip -d desktop/dist-assets/llama
+          find desktop/dist-assets/llama -name "llama-server*" -exec chmod +x {} \;
+
+      - name: Install build dependencies
+        run: python -m pip install -r desktop/requirements-desktop.txt
+
+      - name: Package
+        run: >
+          python -m PyInstaller --noconfirm --clean
+          --distpath desktop/dist --workpath desktop/build
+          desktop/francessca.spec
+
+      - name: Name the binary for its platform
+        shell: bash
+        run: mv "desktop/dist/${{ matrix.built }}" "desktop/dist/${{ matrix.asset }}"
+
+      - name: Checksum
+        shell: bash
+        working-directory: desktop/dist
+        run: |
+          if command -v sha256sum >/dev/null; then
+            sha256sum "${{ matrix.asset }}" | tee "${{ matrix.asset }}.sha256"
+          else
+            shasum -a 256 "${{ matrix.asset }}" | tee "${{ matrix.asset }}.sha256"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: |
+            desktop/dist/${{ matrix.asset }}
+            desktop/dist/${{ matrix.asset }}.sha256
+          retention-days: 14
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/${{ matrix.asset }}
+            desktop/dist/${{ matrix.asset }}.sha256

@@ -1,7 +1,7 @@
 """Auth routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,7 +13,9 @@ from app.schemas.auth import (
     RegisterRequest,
     TokenResponse,
 )
+from app.schemas.portal import LawyerRegisterRequest
 from app.schemas.user import UserOut
+from app.services import email_service
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -23,6 +25,24 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(data: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
     service = AuthService(db)
     user = service.register(data)
+    return TokenResponse(access_token=service.issue_token(user))
+
+
+@router.post(
+    "/register-lawyer", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
+def register_lawyer(
+    data: LawyerRegisterRequest,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Sign up as a lawyer. Signed in straight away; listed in the
+    directory once an admin has approved the profile."""
+    service = AuthService(db)
+    user = service.register_lawyer(data)
+    background.add_task(
+        email_service.lawyer_registered_admin, data.name, user.email, data.city
+    )
     return TokenResponse(access_token=service.issue_token(user))
 
 
