@@ -13,6 +13,7 @@ from app.models.lawyer_application import (  # noqa: F401
     ApplicationStatus,
     LawyerApplication,
 )
+from app.models.trust import LawyerReport, Partner, ReportStatus  # noqa: F401
 from app.models.order import (  # noqa: F401
     FeedbackStatus,
     LawyerFeedback,
@@ -22,6 +23,9 @@ from app.models.order import (  # noqa: F401
 )
 
 __all__ = [
+    "LawyerReport",
+    "Partner",
+    "ReportStatus",
     "Order",
     "OrderStatus",
     "LawyerFeedback",

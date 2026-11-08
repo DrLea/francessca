@@ -1,6 +1,8 @@
 """Admin panel routes. All endpoints require an admin user."""
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
@@ -22,6 +24,7 @@ from app.models.order import (
 )
 from app.models.prompt_version import PromptVersion
 from app.models.token_usage import TokenUsage
+from app.models.trust import LawyerReport, Partner
 from app.models.user import User, UserRole
 from app.repositories.user_repo import UserRepository
 from app.repositories.lawyer_repo import LawyerRepository
@@ -30,12 +33,19 @@ from app.schemas.portal import (
     AdminFeedbackOut,
     AdminFeedbackUpdate,
     AdminLawyerUpdate,
+    PartnerIn,
+    PartnerOut,
+    PartnerUpdate,
+    ReportOut,
+    ReportUpdate,
 )
 from app.schemas.user import AdminUserUpdate, UserOut
 from app.config import settings
 from app.services import email_service
 from app.seeds.lawyers import sample_lawyers
 from app.services.lawyer_service import LawyerService
+from app.services.order_service import OrderService
+from app.services.verification_service import VerificationService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -143,6 +153,7 @@ def approve_lawyer_application(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Lawyer profile is gone"
             )
         lawyer.is_published = True
+        lawyer.start_trial(settings.lawyer_trial_months)
         application.status = ApplicationStatus.approved
         application.reviewed_at = func.now()
         db.commit()
@@ -358,9 +369,10 @@ def overview(_: User = Depends(require_admin), db: Session = Depends(get_db)) ->
     }
 
 
-# --- Registered lawyers: publish state and order allowance --------------
+# --- Registered lawyers: publish state, subscription, verification -------
 def _lawyer_row(db: Session, lawyer: Lawyer, used: int) -> dict:
-    free = max(0, settings.lawyer_free_orders)
+    subscription = OrderService.subscription(lawyer)
+    verification = OrderService.verification(lawyer)
     return {
         "id": lawyer.id,
         "name": lawyer.name,
@@ -370,19 +382,38 @@ def _lawyer_row(db: Session, lawyer: Lawyer, used: int) -> dict:
         "is_published": lawyer.is_published,
         "rating_avg": lawyer.rating_avg,
         "rating_count": lawyer.rating_count,
-        "orders_used": used,
-        "free_total": free,
-        "extra_orders": lawyer.extra_orders,
-        "orders_remaining": max(0, free + lawyer.extra_orders - used),
+        "orders_accepted": used,
+        "subscription": subscription.model_dump(mode="json"),
+        "verification": verification.model_dump(mode="json"),
+        "brak_register_id": lawyer.brak_register_id,
+        "chamber": lawyer.chamber,
+        "admission_date": lawyer.admission_date.isoformat() if lawyer.admission_date else None,
+        "suspension_reason": lawyer.suspension_reason,
+        "open_reports": VerificationService(db).open_report_count(lawyer.id),
+        "partner_id": lawyer.partner_id,
         "created_at": lawyer.created_at.isoformat(),
     }
+
+
+def _get_account(db: Session, lawyer_id: int) -> Lawyer:
+    lawyer = db.get(Lawyer, lawyer_id)
+    if lawyer is None or lawyer.user_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return lawyer
+
+
+def _row_for(db: Session, lawyer: Lawyer) -> dict:
+    used = _count(
+        db, Order, Order.lawyer_id == lawyer.id, Order.status.in_(BILLABLE_STATUSES)
+    )
+    return _lawyer_row(db, lawyer, used)
 
 
 @router.get("/lawyer-accounts")
 def list_lawyer_accounts(
     _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> list[dict]:
-    """Lawyers who have an account, with how many orders they have used."""
+    """Lawyers who have an account, with subscription and verification."""
     used = dict(
         db.execute(
             select(Order.lawyer_id, func.count())
@@ -403,21 +434,162 @@ def update_lawyer_account(
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Unlock more orders after the free ones, or pull a profile from the
-    directory."""
-    lawyer = db.get(Lawyer, lawyer_id)
-    if lawyer is None or lawyer.user_id is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if data.extra_orders is not None:
-        lawyer.extra_orders = data.extra_orders
+    """Publish/unpublish, record a payment, update verification, suspend."""
+    lawyer = _get_account(db, lawyer_id)
+    fields = data.model_dump(exclude_unset=True)
+    now = datetime.now(timezone.utc)
+
     if data.is_published is not None:
         lawyer.is_published = data.is_published
+        if data.is_published:
+            lawyer.start_trial(settings.lawyer_trial_months)
+    # --- subscription
+    if data.extend_paid_months:
+        start = max(lawyer.paid_until or now.date(), now.date())
+        lawyer.paid_until = start + timedelta(days=30 * data.extend_paid_months)
+    if "paid_until" in fields:
+        lawyer.paid_until = data.paid_until
+    if "trial_ends_at" in fields:
+        lawyer.trial_ends_at = data.trial_ends_at
+    # --- verification
+    for key in ("brak_register_id", "chamber", "admission_date"):
+        if key in fields:
+            setattr(lawyer, key, fields[key])
+    if data.register_checked is not None:
+        lawyer.brak_checked_at = now if data.register_checked else None
+    if data.id_check_status is not None:
+        lawyer.id_check_status = data.id_check_status
+        lawyer.id_checked_at = now if data.id_check_status in ("passed", "failed") else None
+    VerificationService.refresh(lawyer)
+    # --- suspension
+    if data.suspended is True:
+        VerificationService.suspend(lawyer, data.suspension_reason or "Suspended by an admin")
+    elif data.suspended is False:
+        VerificationService.lift(lawyer)
+    if "partner_id" in fields:
+        if data.partner_id is not None and db.get(Partner, data.partner_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partner not found")
+        lawyer.partner_id = data.partner_id
     db.commit()
     db.refresh(lawyer)
-    used = _count(
-        db, Order, Order.lawyer_id == lawyer.id, Order.status.in_(BILLABLE_STATUSES)
+    return _row_for(db, lawyer)
+
+
+@router.post("/lawyer-accounts/{lawyer_id}/bea-code")
+def issue_bea_code(
+    lawyer_id: int, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> dict:
+    """Generate a one-time code to send to the lawyer's beA mailbox. The
+    code is shown only in this response; only its hash is stored."""
+    lawyer = _get_account(db, lawyer_id)
+    code = VerificationService(db).issue_bea_code(lawyer)
+    VerificationService.refresh(lawyer)
+    db.commit()
+    db.refresh(lawyer)
+    return {"code": code, "lawyer": _row_for(db, lawyer)}
+
+
+@router.post("/lawyer-accounts/{lawyer_id}/recheck")
+def start_recheck(
+    lawyer_id: int, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> dict:
+    """Yearly re-check: clear the checks so they are done again."""
+    lawyer = _get_account(db, lawyer_id)
+    VerificationService.start_recheck(lawyer)
+    db.commit()
+    db.refresh(lawyer)
+    return _row_for(db, lawyer)
+
+
+@router.get("/rechecks-due")
+def rechecks_due(
+    within_days: int = 30, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> list[dict]:
+    """Verified lawyers whose year runs out soon (or already has)."""
+    limit = date.today() + timedelta(days=within_days)
+    rows = db.scalars(
+        select(Lawyer).where(
+            Lawyer.user_id.is_not(None),
+            Lawyer.verified_until.is_not(None),
+            Lawyer.verified_until <= limit,
+        )
     )
-    return _lawyer_row(db, lawyer, used)
+    return [_row_for(db, lw) for lw in rows]
+
+
+# --- User reports ---------------------------------------------------------
+@router.get("/reports", response_model=list[ReportOut])
+def list_reports(
+    status_filter: str | None = None,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[LawyerReport]:
+    stmt = select(LawyerReport).order_by(desc(LawyerReport.created_at))
+    if status_filter:
+        stmt = stmt.where(LawyerReport.status == status_filter)
+    return list(db.scalars(stmt))
+
+
+@router.patch("/reports/{report_id}", response_model=ReportOut)
+def update_report(
+    report_id: int,
+    data: ReportUpdate,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> LawyerReport:
+    report = db.get(LawyerReport, report_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if data.status is not None:
+        report.status = data.status
+    if data.admin_note is not None:
+        report.admin_note = data.admin_note
+    db.commit()
+    db.refresh(report)
+    return report
+
+
+# --- Partners (universities, Law Clinics, NGOs) ----------------------------
+@router.get("/partners", response_model=list[PartnerOut])
+def list_partners(_: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[Partner]:
+    return list(db.scalars(select(Partner).order_by(Partner.name)))
+
+
+@router.post("/partners", response_model=PartnerOut, status_code=status.HTTP_201_CREATED)
+def create_partner(
+    data: PartnerIn, _: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> Partner:
+    partner = Partner(**data.model_dump(), monthly_fee=settings.partner_monthly_fee)
+    if partner.contact_email:
+        partner.contact_email = str(partner.contact_email)
+    db.add(partner)
+    db.commit()
+    db.refresh(partner)
+    return partner
+
+
+@router.patch("/partners/{partner_id}", response_model=PartnerOut)
+def update_partner(
+    partner_id: int,
+    data: PartnerUpdate,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Partner:
+    partner = db.get(Partner, partner_id)
+    if partner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    fields = data.model_dump(exclude_unset=True)
+    months = fields.pop("extend_paid_months", None)
+    for key, value in fields.items():
+        setattr(partner, key, str(value) if key == "contact_email" and value else value)
+    if months:
+        today = date.today()
+        start = max(partner.paid_until or today, today)
+        partner.paid_until = start + timedelta(days=30 * months)
+        partner.status = "active"
+    db.commit()
+    db.refresh(partner)
+    return partner
 
 
 # --- Lawyer feedback ----------------------------------------------------

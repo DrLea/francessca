@@ -1,4 +1,4 @@
-# Francessca frontend
+# Francesca frontend
 
 Next.js 14 (App Router) + TypeScript + TailwindCSS. Minimal scaffold covering
 auth, chat, lawyer search, and shared UI primitives. Talks to the backend via

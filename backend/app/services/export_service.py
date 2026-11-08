@@ -79,43 +79,43 @@ _SECTION_LABEL_TRANSLATIONS: dict[str, dict[str, str]] = {
 
 _DISCLAIMER_TRANSLATIONS: dict[str, str] = {
     "de": (
-        "Dieses Dokument wurde von Francessca erstellt, einem KI-Assistenten, der Fakten "
+        "Dieses Dokument wurde von Francesca erstellt, einem KI-Assistenten, der Fakten "
         "organisiert. Es ist KEINE Rechtsberatung. Bitte lassen Sie diese Unterlagen von "
         "einem qualifizierten Anwalt prüfen."
     ),
     "tr": (
         "Bu belge, gerçekleri düzenlemeye yardımcı olan bir yapay zeka asistanı olan "
-        "Francessca tarafından hazırlanmıştır. Bu bir HUKUKİ TAVSİYE DEĞİLDİR. Lütfen bu "
+        "Francesca tarafından hazırlanmıştır. Bu bir HUKUKİ TAVSİYE DEĞİLDİR. Lütfen bu "
         "belgeleri yetkin bir avukata inceletin."
     ),
     "ar": (
-        "تم إعداد هذا المستند بواسطة Francessca، وهو مساعد ذكاء اصطناعي يساعد في تنظيم "
+        "تم إعداد هذا المستند بواسطة Francesca، وهو مساعد ذكاء اصطناعي يساعد في تنظيم "
         "الوقائع. هذا ليس استشارة قانونية. يرجى مراجعة هذه المستندات من قبل محامٍ مؤهل."
     ),
     "uk": (
-        "Цей документ підготовано Francessca, ШІ-асистентом, який допомагає "
+        "Цей документ підготовано Francesca, ШІ-асистентом, який допомагає "
         "організовувати факти. Це НЕ юридична консультація. Будь ласка, попросіть "
         "кваліфікованого юриста перевірити ці документи."
     ),
     "ru": (
-        "Этот документ подготовлен Francessca, ИИ-ассистентом, который помогает "
+        "Этот документ подготовлен Francesca, ИИ-ассистентом, который помогает "
         "организовывать факты. Это НЕ юридическая консультация. Пожалуйста, попросите "
         "квалифицированного юриста проверить эти документы."
     ),
     "pl": (
-        "Ten dokument został przygotowany przez Francessca, asystenta AI pomagającego "
+        "Ten dokument został przygotowany przez Francesca, asystenta AI pomagającego "
         "uporządkować fakty. To NIE jest porada prawna. Prosimy o sprawdzenie tych "
         "dokumentów przez wykwalifikowanego prawnika."
     ),
     "ro": (
-        "Acest document a fost pregătit de Francessca, un asistent AI care ajută la "
+        "Acest document a fost pregătit de Francesca, un asistent AI care ajută la "
         "organizarea faptelor. NU reprezintă consultanță juridică. Vă rugăm ca aceste "
         "documente să fie verificate de un avocat calificat."
     ),
 }
 
 _DISCLAIMER = (
-    "This document was prepared by Francessca, an AI assistant that helps organize "
+    "This document was prepared by Francesca, an AI assistant that helps organize "
     "facts. It is NOT legal advice. Please have these documents reviewed by a "
     "qualified lawyer."
 )

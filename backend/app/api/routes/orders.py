@@ -18,7 +18,7 @@ from app.repositories.timeline_repo import TimelineRepository
 from app.schemas.portal import ClientOrderOut, OrderCreate, ReviewCreate
 from app.services import email_service
 from app.services.lead_quality import score_lead
-from app.services.order_service import OrderService
+from app.services.order_service import OrderService, utcnow
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 log = get_logger("francessca.orders")
@@ -43,13 +43,18 @@ def send_case(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Lawyer accounts cannot send cases",
         )
+    if not data.consent:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Please confirm that you want to share this case with this lawyer",
+        )
     lawyer = db.get(Lawyer, data.lawyer_id)
     if lawyer is None or not lawyer.is_published:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lawyer not found")
     if not lawyer.accepts_requests:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This lawyer cannot receive cases through Francessca yet",
+            detail="This lawyer cannot receive cases through Francesca yet",
         )
     already = db.scalar(
         select(func.count())
@@ -113,6 +118,7 @@ def send_case(
         case_summary=summary,
         quality_score=score,
         quality_breakdown=breakdown,
+        consent_at=utcnow(),
     )
     db.add(order)
     db.commit()
@@ -156,6 +162,30 @@ def cancel_order(
     order.status = OrderStatus.cancelled.value
     db.commit()
     db.refresh(order)
+    return OrderService(db).to_client(order)
+
+
+@router.post("/{order_id}/withdraw", response_model=ClientOrderOut)
+def withdraw_consent(
+    order_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClientOrderOut:
+    """Take back consent for a case already shared with a lawyer. From now
+    on the lawyer no longer sees the case file or the client's contact."""
+    order = _own_order(db, user, order_id)
+    if order.status in (OrderStatus.cancelled.value, OrderStatus.withdrawn.value):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Consent was already withdrawn"
+        )
+    order.status = (
+        OrderStatus.cancelled if order.status == OrderStatus.pending.value
+        else OrderStatus.withdrawn
+    ).value
+    order.consent_withdrawn_at = utcnow()
+    db.commit()
+    db.refresh(order)
+    log_event(log, "order_consent_withdrawn", order_id=order.id)
     return OrderService(db).to_client(order)
 
 

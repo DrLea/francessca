@@ -1,4 +1,4 @@
-// Francessca service worker: makes the site installable and lets the app
+// Francesca service worker: makes the site installable and lets the app
 // shell — above all the offline assistant at /offline — open with no
 // network. It never touches the API: user data is not cached here.
 

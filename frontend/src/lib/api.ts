@@ -1,4 +1,4 @@
-// Typed API client for the Francessca backend.
+// Typed API client for the Francesca backend.
 // The JWT is persisted in localStorage and attached to every request.
 
 // The desktop build serves the UI from the API process itself, so requests

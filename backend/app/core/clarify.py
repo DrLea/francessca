@@ -1,6 +1,6 @@
 """Structured clarifying questions.
 
-Francessca's whole job is asking the right questions, but asking them in
+Francesca's whole job is asking the right questions, but asking them in
 prose makes the user face a wall of them at once -- and most people answer
 only the first. Instead the model appends a small machine-readable block to
 its reply; the frontend turns that into a one-question-at-a-time flow and

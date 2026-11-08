@@ -19,7 +19,7 @@ def test_register_login_me(client):
     me = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
     assert me.json()["email"] == "user@example.com"
-    assert me.json()["token_limit"] == 100_000
+    assert me.json()["token_limit"] is None  # default fair-use cap
 
 
 def test_chat_uses_fake_ai_and_records_tokens(client, db_session, monkeypatch):
@@ -41,7 +41,7 @@ def test_chat_uses_fake_ai_and_records_tokens(client, db_session, monkeypatch):
     # mentions no date or scheduled thing, so timeline extraction is skipped
     # before it costs a call.
     assert body["tokens_used"] == 70
-    assert body["tokens_remaining"] == 100_000 - 70
+    assert body["tokens_remaining"] == 200_000 - 70  # default daily fair-use cap
 
     # A message that does mention something scheduled pays for the extra
     # extraction call.

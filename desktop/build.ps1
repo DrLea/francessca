@@ -1,5 +1,5 @@
 ﻿<#
-    Builds Francessca.exe - the offline desktop build - on Windows.
+    Builds Francesca.exe - the offline desktop build - on Windows.
 
     Prerequisites:
       * Python 3.11+ on PATH          (python --version)
@@ -15,7 +15,7 @@
 
     From cmd.exe, run build.cmd instead - same arguments.
 
-    Output: desktop\dist\Francessca.exe
+    Output: desktop\dist\Francesca.exe
 
     NOTE: keep this file ASCII-only and saved as UTF-8 with BOM. Windows
     PowerShell 5.1 reads a BOM-less file as ANSI, and a mis-decoded dash or
@@ -218,5 +218,5 @@ $pyiArgs = @(
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 
 Write-Host ""
-Write-Host ("Done: " + (Join-Path $Here "dist\Francessca.exe")) -ForegroundColor Green
-Write-Host "First launch downloads the model (about 2 GB) into %LOCALAPPDATA%\Francessca."
+Write-Host ("Done: " + (Join-Path $Here "dist\Francesca.exe")) -ForegroundColor Green
+Write-Host "First launch downloads the model (about 2 GB) into %LOCALAPPDATA%\Francesca."

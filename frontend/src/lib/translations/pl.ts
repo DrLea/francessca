@@ -11,7 +11,7 @@ const pl: Record<TranslationKey, string> = {
   "nav.langSwitcherTitle": "Czat, eksporty i formularze będą korzystać z tego języka",
 
   "home.tagline":
-    "Przygotuj się, zanim porozmawiasz z prawnikiem. Francessca zadaje właściwe pytania, zbiera fakty, pomaga wypełnić standardowe formularze i tworzy uporządkowane podsumowanie, które możesz przekazać wykwalifikowanemu prawnikowi w Niemczech.",
+    "Przygotuj się, zanim porozmawiasz z prawnikiem. Francesca zadaje właściwe pytania, zbiera fakty, pomaga wypełnić standardowe formularze i tworzy uporządkowane podsumowanie, które możesz przekazać wykwalifikowanemu prawnikowi w Niemczech.",
   "home.getStarted": "Rozpocznij",
   "home.findLawyer": "Znajdź prawnika",
 
@@ -75,7 +75,7 @@ const pl: Record<TranslationKey, string> = {
   "home.submitting": "Wysyłanie…",
 
   "common.disclaimer":
-    "Francessca nie jest prawnikiem i nie udziela porad prawnych. Zawsze zlecaj przegląd dokumentów wykwalifikowanemu prawnikowi.",
+    "Francesca nie jest prawnikiem i nie udziela porad prawnych. Zawsze zlecaj przegląd dokumentów wykwalifikowanemu prawnikowi.",
   "common.loading": "Ładowanie…",
 
   "login.titleLogin": "Zaloguj się",
@@ -96,14 +96,14 @@ const pl: Record<TranslationKey, string> = {
   "chat.generating": "Generowanie…",
   "chat.exportDone": "Pobrano PDF z podsumowaniem sprawy.",
   "chat.emptyPrompt": "Opowiedz, co się stało. Na przykład: „Zostałem/am zwolniony/a wczoraj”.",
-  "chat.typing": "Francessca pisze…",
+  "chat.typing": "Francesca pisze…",
   "chat.attachDocuments": "Załącz dokumenty:",
   "chat.typeMessage": "Wpisz wiadomość…",
   "chat.send": "Wyślij",
 
   "files.title": "Dokumenty",
   "files.subtitle":
-    "Prześlij pliki PDF, obrazy, DOCX lub TXT (maks. {{maxMb}} MB). Tekst jest wyodrębniany automatycznie — w tym OCR dla obrazów — dzięki czemu Francessca może go wykorzystać.",
+    "Prześlij pliki PDF, obrazy, DOCX lub TXT (maks. {{maxMb}} MB). Tekst jest wyodrębniany automatycznie — w tym OCR dla obrazów — dzięki czemu Francesca może go wykorzystać.",
   "files.uploadButton": "Prześlij dokument",
   "files.uploading": "Przesyłanie…",
   "files.textExtracted": "Tekst wyodrębniony",
@@ -132,7 +132,7 @@ const pl: Record<TranslationKey, string> = {
 
   "timeline.title": "Oś czasu sprawy",
   "timeline.loadingTimeline": "Ładowanie osi czasu…",
-  "timeline.subtitle": "Spotkania, rozprawy, terminy i daty wygaśnięcia, które Francessca znajduje w Twoich dokumentach i wiadomościach — każdy wpis z odnośnikiem do źródła.",
+  "timeline.subtitle": "Spotkania, rozprawy, terminy i daty wygaśnięcia, które Francesca znajduje w Twoich dokumentach i wiadomościach — każdy wpis z odnośnikiem do źródła.",
   "timeline.noEvents": "Brak dat. Prześlij dokument albo wspomnij na czacie o czymś zaplanowanym — spotkaniu, terminie, dacie wygaśnięcia — a pojawi się tutaj.",
   "timeline.delete": "Usuń",
   "timeline.deleting": "Usuwanie…",

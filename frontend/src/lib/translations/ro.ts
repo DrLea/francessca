@@ -11,7 +11,7 @@ const ro: Record<TranslationKey, string> = {
   "nav.langSwitcherTitle": "Chatul, exporturile și formularele vor folosi această limbă",
 
   "home.tagline":
-    "Organizează-te înainte de a vorbi cu un avocat. Francessca pune întrebările potrivite, îți colectează faptele, te ajută să completezi formulare standard și produce un rezumat structurat pe care îl poți preda unui avocat calificat din Germania.",
+    "Organizează-te înainte de a vorbi cu un avocat. Francesca pune întrebările potrivite, îți colectează faptele, te ajută să completezi formulare standard și produce un rezumat structurat pe care îl poți preda unui avocat calificat din Germania.",
   "home.getStarted": "Începe",
   "home.findLawyer": "Găsește un avocat",
 
@@ -42,7 +42,7 @@ const ro: Record<TranslationKey, string> = {
   "home.checksums": "Sume de control SHA-256, pentru a verifica fișierul descărcat:",
   "home.download": "Descarcă pentru {{platform}}",
   "home.pricingTitle": "Planuri",
-  "home.pricingBeta": "Cât timp Francessca este în beta, totul este gratuit — fără card, fără plată.",
+  "home.pricingBeta": "Cât timp Francesca este în beta, totul este gratuit — fără card, fără plată.",
   "home.planFree": "Gratuit",
   "home.planFreePrice": "0 €",
   "home.planFreeF1": "Întrebări ghidate în 8 limbi",
@@ -75,7 +75,7 @@ const ro: Record<TranslationKey, string> = {
   "home.submitting": "Se trimite…",
 
   "common.disclaimer":
-    "Francessca nu este avocat și nu oferă consultanță juridică. Documentele trebuie verificate întotdeauna de un avocat calificat.",
+    "Francesca nu este avocat și nu oferă consultanță juridică. Documentele trebuie verificate întotdeauna de un avocat calificat.",
   "common.loading": "Se încarcă…",
 
   "login.titleLogin": "Autentificare",
@@ -96,14 +96,14 @@ const ro: Record<TranslationKey, string> = {
   "chat.generating": "Se generează…",
   "chat.exportDone": "PDF-ul cu rezumatul cazului a fost descărcat.",
   "chat.emptyPrompt": "Spune-mi ce s-a întâmplat. De exemplu: „Am fost concediat ieri”.",
-  "chat.typing": "Francessca scrie…",
+  "chat.typing": "Francesca scrie…",
   "chat.attachDocuments": "Atașează documente:",
   "chat.typeMessage": "Scrie un mesaj…",
   "chat.send": "Trimite",
 
   "files.title": "Documente",
   "files.subtitle":
-    "Încarcă fișiere PDF, imagine, DOCX sau TXT (max. {{maxMb}} MB). Textul este extras automat — inclusiv OCR pentru imagini — astfel încât Francessca să îl poată folosi.",
+    "Încarcă fișiere PDF, imagine, DOCX sau TXT (max. {{maxMb}} MB). Textul este extras automat — inclusiv OCR pentru imagini — astfel încât Francesca să îl poată folosi.",
   "files.uploadButton": "Încarcă un document",
   "files.uploading": "Se încarcă…",
   "files.textExtracted": "Text extras",
@@ -132,7 +132,7 @@ const ro: Record<TranslationKey, string> = {
 
   "timeline.title": "Cronologia cazului",
   "timeline.loadingTimeline": "Se încarcă cronologia…",
-  "timeline.subtitle": "Programări, ședințe, termene și date de expirare pe care Francessca le găsește în documentele și mesajele dumneavoastră — fiecare cu legătură către sursă.",
+  "timeline.subtitle": "Programări, ședințe, termene și date de expirare pe care Francesca le găsește în documentele și mesajele dumneavoastră — fiecare cu legătură către sursă.",
   "timeline.noEvents": "Încă nu există date. Încărcați un document sau menționați în chat ceva programat — o programare, un termen, o dată de expirare — și va apărea aici.",
   "timeline.delete": "Șterge",
   "timeline.deleting": "Se șterge…",

@@ -36,7 +36,7 @@ BASE_URL = "https://www.rak-muenchen.de"
 DIRECTORY_PATH = "/anwaltsverzeichnis/"
 _CACHE_TTL = 60 * 60 * 24  # 24h
 _REQUEST_DELAY = 1.0  # seconds between requests (politeness)
-_USER_AGENT = "FrancesscaBot/0.1 (+https://francessca.app; legal-prep assistant)"
+_USER_AGENT = "FrancescaBot/0.1 (+https://francessca.app; legal-prep assistant)"
 
 
 @dataclass

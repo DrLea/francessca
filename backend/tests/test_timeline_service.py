@@ -24,7 +24,7 @@ class _FakeAI:
         self.calls = 0
 
     def complete(self, *, system_prompt, messages, max_tokens=1024):  # noqa: ANN001
-        assert "Francessca" in system_prompt
+        assert "Francesca" in system_prompt
         self.calls += 1
         return AIResult(text=self.reply, input_tokens=40, output_tokens=15, model=self.model)
 

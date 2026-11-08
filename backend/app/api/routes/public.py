@@ -30,9 +30,9 @@ log = get_logger("francessca.public")
 
 # Fixed names, so nothing from the request ever reaches the filesystem.
 DOWNLOAD_FILENAMES = {
-    "windows": "Francessca.exe",
-    "mac": "Francessca.dmg",
-    "linux": "Francessca",
+    "windows": "Francesca.exe",
+    "mac": "Francesca.dmg",
+    "linux": "Francesca",
 }
 
 # Hashing 175 MB takes seconds; do it once per file, keyed by what would
@@ -70,14 +70,14 @@ def preview_lawyers(
 
     total = (
         db.scalar(
-            select(func.count()).select_from(Lawyer).where(Lawyer.is_published.is_(True))
+            select(func.count()).select_from(Lawyer).where(Lawyer.is_published.is_(True), Lawyer.suspended_at.is_(None))
         )
         or 0
     )
     rows = db.scalars(
         select(Lawyer)
         .options(selectinload(Lawyer.specializations))
-        .where(Lawyer.is_published.is_(True))
+        .where(Lawyer.is_published.is_(True), Lawyer.suspended_at.is_(None))
         .order_by(Lawyer.name)
         .limit(limit)
     )

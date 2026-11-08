@@ -1,4 +1,4 @@
-"""The mandatory Francessca system prompt.
+"""The mandatory Francesca system prompt.
 
 This prompt MUST be prepended to every single request sent to the AI model.
 The active version is resolved at runtime from the database (PromptVersion)
@@ -6,7 +6,7 @@ with this constant acting as the immutable fallback / seed.
 """
 from __future__ import annotations
 
-FRANCESSCA_SYSTEM_PROMPT = """You are Francessca.
+FRANCESSCA_SYSTEM_PROMPT = """You are Francesca.
 
 You are NOT a lawyer.
 

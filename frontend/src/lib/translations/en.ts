@@ -9,7 +9,7 @@ const en = {
   "nav.langSwitcherTitle": "Chat, exports, and forms will use this language",
 
   "home.tagline":
-    "Get organized before you speak with a lawyer. Francessca asks the right questions, collects your facts, helps fill standard forms, and produces a structured summary you can hand to a qualified lawyer in Germany.",
+    "Get organized before you speak with a lawyer. Francesca asks the right questions, collects your facts, helps fill standard forms, and produces a structured summary you can hand to a qualified lawyer in Germany.",
   "home.getStarted": "Get started",
   "home.findLawyer": "Find a lawyer",
 
@@ -24,7 +24,7 @@ const en = {
   "home.betaBadge": "Free while in beta",
   "home.openChat": "Open chat",
   "home.stepsTitle": "How it works",
-  "home.step1Title": "Tell Francessca what happened",
+  "home.step1Title": "Tell Francesca what happened",
   "home.step1Body": "She asks the right questions one at a time, in your language — no legal jargon.",
   "home.step2Title": "Add your documents",
   "home.step2Body": "Upload letters and contracts. Text is extracted automatically, and every date lands in your timeline.",
@@ -40,7 +40,7 @@ const en = {
   "home.checksums": "SHA-256 checksums, to verify what you downloaded:",
   "home.download": "Download for {{platform}}",
   "home.pricingTitle": "Plans",
-  "home.pricingBeta": "Everything is free while Francessca is in beta — no card, no payment.",
+  "home.pricingBeta": "Everything is free while Francesca is in beta — no card, no payment.",
   "home.planFree": "Free",
   "home.planFreePrice": "€0",
   "home.planFreeF1": "Guided questions in 8 languages",
@@ -73,7 +73,7 @@ const en = {
   "home.submitting": "Sending…",
 
   "common.disclaimer":
-    "Francessca is not a lawyer and does not provide legal advice. Always have documents reviewed by a qualified lawyer.",
+    "Francesca is not a lawyer and does not provide legal advice. Always have documents reviewed by a qualified lawyer.",
   "common.loading": "Loading…",
 
   "login.titleLogin": "Log in",
@@ -95,14 +95,14 @@ const en = {
   "chat.exportDone": "Case summary PDF downloaded.",
   "chat.emptyPrompt":
     "Tell me what happened. For example: “I was fired yesterday.”",
-  "chat.typing": "Francessca is typing…",
+  "chat.typing": "Francesca is typing…",
   "chat.attachDocuments": "Attach documents:",
   "chat.typeMessage": "Type your message…",
   "chat.send": "Send",
 
   "files.title": "Documents",
   "files.subtitle":
-    "Upload PDF, image, DOCX, or TXT files (max {{maxMb}} MB). Text is extracted automatically — including OCR for images — so Francessca can use it.",
+    "Upload PDF, image, DOCX, or TXT files (max {{maxMb}} MB). Text is extracted automatically — including OCR for images — so Francesca can use it.",
   "files.uploadButton": "Upload a document",
   "files.uploading": "Uploading…",
   "files.textExtracted": "Text extracted",
@@ -131,7 +131,7 @@ const en = {
 
   "timeline.title": "Case timeline",
   "timeline.loadingTimeline": "Loading timeline…",
-  "timeline.subtitle": "Appointments, hearings, deadlines and expiry dates that Francessca finds in your documents and messages — each one linked back to where it came from.",
+  "timeline.subtitle": "Appointments, hearings, deadlines and expiry dates that Francesca finds in your documents and messages — each one linked back to where it came from.",
   "timeline.noEvents": "No dates yet. Upload a document or mention something scheduled in chat — an appointment, a deadline, an expiry date — and it will appear here.",
   "timeline.delete": "Delete",
   "timeline.deleting": "Deleting…",

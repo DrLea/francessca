@@ -32,10 +32,11 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
 
-    # AI provider: "anthropic" for the hosted Claude API, "local" for any
-    # OpenAI-compatible server — which is what the offline desktop build
-    # runs (a bundled llama.cpp serving a small instruct model).
-    ai_provider: str = Field("anthropic", alias="AI_PROVIDER")
+    # AI provider. "local" (default) is any OpenAI-compatible server we run
+    # ourselves -- Ollama / llama.cpp / vLLM on our own machine in Germany --
+    # so no case data goes to a third-party AI service. "anthropic" is an
+    # opt-in fallback for development only.
+    ai_provider: str = Field("local", alias="AI_PROVIDER")
 
     # Anthropic
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
@@ -58,7 +59,7 @@ class Settings(BaseSettings):
     smtp_port: int = Field(587, alias="SMTP_PORT")
     smtp_user: str = Field("", alias="SMTP_USER")
     smtp_password: str = Field("", alias="SMTP_PASSWORD")
-    smtp_from: str = Field("no-reply@francessca.app", alias="SMTP_FROM")
+    smtp_from: str = Field("no-reply@francesca.app", alias="SMTP_FROM")
 
     # URLs
     frontend_url: str = Field("http://localhost:3000", alias="FRONTEND_URL")
@@ -66,10 +67,24 @@ class Settings(BaseSettings):
     cors_origins: str = Field("http://localhost:3000", alias="CORS_ORIGINS")
 
     # App behaviour
-    free_tier_token_limit: int = Field(100_000, alias="FREE_TIER_TOKEN_LIMIT")
-    # How many orders a newly registered lawyer can accept for free. After
-    # that they see a "contact us" screen until an admin unlocks more.
-    lawyer_free_orders: int = Field(3, alias="LAWYER_FREE_ORDERS")
+    # Hidden fair-use cap: tokens per user per rolling 24 h. People never
+    # see a plan; this only stops abuse. Admins can override per user.
+    fair_use_daily_tokens: int = Field(200_000, alias="FAIR_USE_DAILY_TOKENS")
+    # Law firms: a flat monthly fee after a free trial that starts when the
+    # profile is approved. Never per client (§49b Abs. 3 BRAO).
+    lawyer_trial_months: int = Field(3, alias="LAWYER_TRIAL_MONTHS")
+    lawyer_monthly_fee: float = Field(99.0, alias="LAWYER_MONTHLY_FEE")
+    # Universities / Law Clinics: partner licence per month.
+    partner_monthly_fee: float = Field(500.0, alias="PARTNER_MONTHLY_FEE")
+    # Distinct open user reports that suspend a lawyer automatically until
+    # an admin has reviewed them.
+    report_suspend_threshold: int = Field(3, alias="REPORT_SUSPEND_THRESHOLD")
+    # AES-256-GCM key for data at rest (uploads, messages, case files):
+    # 32 random bytes, base64. Generate: python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
+    # If empty, a key is derived from JWT_SECRET (fine for development only).
+    data_encryption_key: str = Field("", alias="DATA_ENCRYPTION_KEY")
+    # Deadline reminders: days before a deadline to remind (email + in-app).
+    reminder_days: str = Field("7,1", alias="REMINDER_DAYS")
     # Shown on that screen, and where lawyer sign-ups / feedback are mailed.
     # Falls back to ADMIN_EMAIL.
     support_email: str = Field("", alias="SUPPORT_EMAIL")
@@ -93,7 +108,7 @@ class Settings(BaseSettings):
     # Serve the builds from this deployment instead of a third-party host.
     # Put the files in this directory under the names in DOWNLOAD_FILENAMES
     # and they are offered at /public/download/<platform> -- same domain as
-    # the app, so wherever Francessca is reachable, so is the download.
+    # the app, so wherever Francesca is reachable, so is the download.
     download_dir: str = Field("", alias="DOWNLOAD_DIR")
     download_windows: str = Field("", alias="DOWNLOAD_WINDOWS")
     download_windows_sha256: str = Field("", alias="DOWNLOAD_WINDOWS_SHA256")

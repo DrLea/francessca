@@ -6,12 +6,12 @@ import { PwaProvider } from "@/lib/pwa";
 import { NavBar } from "@/components/NavBar";
 
 export const metadata: Metadata = {
-  title: "Francessca",
+  title: "Francesca",
   description: "Prepare for speaking with a qualified lawyer. Not legal advice.",
   // Installable: home screen on a phone, a windowed app on a computer.
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
-  appleWebApp: { capable: true, title: "Francessca", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Francesca", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

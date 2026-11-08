@@ -76,6 +76,7 @@ class LawyerPublicOut(BaseModel):
     city: str | None
     specializations: list[str] = Field(default_factory=list)
     languages: list[str] = Field(default_factory=list)
+    is_verified: bool = False
 
     @field_validator("languages", mode="before")
     @classmethod

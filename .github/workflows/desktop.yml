@@ -28,23 +28,23 @@ jobs:
         include:
           - os: windows-latest
             label: windows-x64
-            built: Francessca.exe
-            asset: Francessca-windows-x64.exe
+            built: Francesca.exe
+            asset: Francesca-windows-x64.exe
             llama: bin-win-cpu-x64
           - os: macos-latest
             label: macos-arm64
-            built: Francessca
-            asset: Francessca-macos-arm64
+            built: Francesca
+            asset: Francesca-macos-arm64
             llama: bin-macos-arm64
           - os: macos-13
             label: macos-x64
-            built: Francessca
-            asset: Francessca-macos-x64
+            built: Francesca
+            asset: Francesca-macos-x64
             llama: bin-macos-x64
           - os: ubuntu-latest
             label: linux-x64
-            built: Francessca
-            asset: Francessca-linux-x64
+            built: Francesca
+            asset: Francesca-linux-x64
             llama: bin-ubuntu-x64
 
     steps:

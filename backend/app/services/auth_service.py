@@ -23,8 +23,8 @@ class AuthService:
         self.db = db
         self.users = UserRepository(db)
 
-    def _default_limit(self) -> int:
-        return settings.free_tier_token_limit
+    def _default_limit(self) -> int | None:
+        return None  # NULL = default fair-use cap (settings.fair_use_daily_tokens)
 
     def register(self, data: RegisterRequest) -> User:
         if self.users.get_by_email(data.email):

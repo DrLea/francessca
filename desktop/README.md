@@ -1,10 +1,10 @@
-# Francessca — offline desktop build
+# Francesca — offline desktop build
 
 The same application as the server deployment, packaged as a single
 executable that runs entirely on the user's machine:
 
 ```
-Francessca.exe
+Francesca.exe
   ├── llama.cpp server   127.0.0.1:8757   local model, no network
   └── FastAPI + uvicorn  127.0.0.1:8756   API *and* the exported UI
 ```
@@ -18,7 +18,7 @@ Anthropic API, and FastAPI serves the statically exported Next.js UI itself.
 | | |
 |---|---|
 | Bundled, read-only (inside the executable) | `frontend/` exported UI · `llama/` model server · `tesseract/` OCR engine |
-| Per-user, writable | `%LOCALAPPDATA%\Francessca` (Windows) · `~/.local/share/Francessca` (Linux) · `~/Library/Application Support/Francessca` (macOS) |
+| Per-user, writable | `%LOCALAPPDATA%\Francesca` (Windows) · `~/.local/share/Francesca` (Linux) · `~/Library/Application Support/Francesca` (macOS) |
 | Kept there | `francessca.db`, `uploads/`, the downloaded `.gguf`, `secret.key` |
 
 Upgrading is replacing the executable; the user's data stays put.
@@ -69,7 +69,7 @@ GPU build (cuda / vulkan / hip). If neither works, the build still succeeds —
 the app then expects an OpenAI-compatible server (Ollama, LM Studio) on port
 8757 instead of starting its own.
 
-Result: `desktop\dist\Francessca.exe`.
+Result: `desktop\dist\Francesca.exe`.
 
 First build takes a few minutes: it exports the UI, downloads llama.cpp,
 copies Tesseract, creates a Python venv and installs the build
@@ -109,7 +109,7 @@ Without it, everything works except OCR of scanned images.
 
 **Gatekeeper.** An unsigned macOS binary is quarantined: users must
 right-click and choose Open the first time, or run
-`xattr -d com.apple.quarantine Francessca-macos-arm64`. Removing that means
+`xattr -d com.apple.quarantine Francesca-macos-arm64`. Removing that means
 notarizing with an Apple Developer account (99 USD/year) -- the same class
 of problem as SmartScreen on Windows.
 
@@ -205,9 +205,9 @@ rebuilt, and nothing is hardcoded in the bundle.
 next to `docker-compose.yml` and set `DOWNLOAD_DIR=/data/downloads`:
 
 ```
-francessca/downloads/Francessca.exe      # Windows
-francessca/downloads/Francessca.dmg      # macOS
-francessca/downloads/Francessca          # Linux
+francessca/downloads/Francesca.exe      # Windows
+francessca/downloads/Francesca.dmg      # macOS
+francessca/downloads/Francesca          # Linux
 ```
 
 The API serves them at `/public/download/<platform>` on the app's own
@@ -224,7 +224,7 @@ wins over an external URL when both are configured.
 builds are hashed automatically:
 
 ```powershell
-certutil -hashfile desktop\dist\Francessca.exe SHA256
+certutil -hashfile desktop\dist\Francesca.exe SHA256
 ```
 
 **3. Point the deployment at it** in the root `.env`:

@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.logging import get_logger, log_event
 from app.database import get_db
 from app.dependencies import get_current_user, require_lawyer
@@ -16,6 +17,7 @@ from app.models.lawyer_application import ApplicationStatus, LawyerApplication
 from app.models.order import LawyerFeedback, LawyerReview, Order, OrderStatus
 from app.models.user import User
 from app.schemas.portal import (
+    BeaCodeConfirm,
     FeedbackCreate,
     FeedbackOut,
     LawyerMeOut,
@@ -27,6 +29,7 @@ from app.schemas.portal import (
 )
 from app.services import email_service
 from app.services.order_service import OrderService, profile_completeness, utcnow
+from app.services.verification_service import VerificationService
 
 router = APIRouter(prefix="/lawyer", tags=["lawyer portal"])
 log = get_logger("francessca.lawyer")
@@ -49,7 +52,8 @@ def _me(db: Session, lawyer: Lawyer) -> LawyerMeOut:
     return LawyerMeOut(
         approval=_approval(db, lawyer),
         profile=LawyerProfileOut.model_validate(lawyer),
-        quota=OrderService(db).quota(lawyer),
+        subscription=OrderService.subscription(lawyer),
+        verification=OrderService.verification(lawyer),
         profile_completeness=profile_completeness(lawyer),
     )
 
@@ -83,6 +87,8 @@ def update_profile(
 
     if "name" in fields and not fields["name"]:
         fields.pop("name")  # the one field that may not be cleared
+    register_keys = ("name", "brak_register_id", "chamber", "admission_date")
+    before = tuple(getattr(lawyer, k) for k in register_keys)
     for key, value in fields.items():
         if isinstance(value, str):
             value = value.strip() or None
@@ -104,7 +110,25 @@ def update_profile(
         ]
     if lawyer.name:
         user.full_name = lawyer.name
+    if tuple(getattr(lawyer, k) for k in register_keys) != before:
+        # The register check was for the old details.
+        lawyer.brak_checked_at = None
+        VerificationService.refresh(lawyer)
 
+    db.commit()
+    db.refresh(lawyer)
+    return _me(db, lawyer)
+
+
+# --- Verification -------------------------------------------------------
+@router.post("/verification/bea", response_model=LawyerMeOut)
+def confirm_bea_code(
+    data: BeaCodeConfirm,
+    lawyer: Lawyer = Depends(require_lawyer),
+    db: Session = Depends(get_db),
+) -> LawyerMeOut:
+    """Type back the code that was sent to the lawyer's beA mailbox."""
+    VerificationService(db).confirm_bea_code(lawyer, data.code)
     db.commit()
     db.refresh(lawyer)
     return _me(db, lawyer)
@@ -141,15 +165,20 @@ def accept_order(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=f"Order is already {order.status}"
         )
-    quota = service.quota(lawyer)
-    if quota.remaining <= 0:
-        # The soft paywall: no payment flow yet, an admin unlocks more.
+    subscription = service.subscription(lawyer)
+    if not subscription.can_accept:
+        # Flat fee, never per client: once the trial is over a firm needs an
+        # active subscription. No payment provider yet -- an admin records
+        # payment in /admin/lawyers.
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Your free orders are used up. Contact us to continue.",
+            detail=(
+                "Your free trial has ended. Francesca costs a flat "
+                f"EUR {settings.lawyer_monthly_fee:.0f} per month - contact us to continue."
+            ),
         )
     order.status = OrderStatus.accepted.value
-    order.is_free = quota.free_remaining > 0
+    order.is_free = subscription.state == "trial"
     order.responded_at = utcnow()
     db.commit()
     db.refresh(order)

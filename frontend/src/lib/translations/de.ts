@@ -11,7 +11,7 @@ const de: Record<TranslationKey, string> = {
   "nav.langSwitcherTitle": "Chat, Exporte und Formulare verwenden diese Sprache",
 
   "home.tagline":
-    "Bereiten Sie sich vor, bevor Sie mit einem Anwalt sprechen. Francessca stellt die richtigen Fragen, erfasst Ihre Fakten, hilft beim Ausfüllen von Standardformularen und erstellt eine strukturierte Zusammenfassung, die Sie einem qualifizierten Anwalt in Deutschland übergeben können.",
+    "Bereiten Sie sich vor, bevor Sie mit einem Anwalt sprechen. Francesca stellt die richtigen Fragen, erfasst Ihre Fakten, hilft beim Ausfüllen von Standardformularen und erstellt eine strukturierte Zusammenfassung, die Sie einem qualifizierten Anwalt in Deutschland übergeben können.",
   "home.getStarted": "Loslegen",
   "home.findLawyer": "Anwalt finden",
 
@@ -26,7 +26,7 @@ const de: Record<TranslationKey, string> = {
   "home.betaBadge": "Kostenlos in der Beta",
   "home.openChat": "Chat öffnen",
   "home.stepsTitle": "So funktioniert es",
-  "home.step1Title": "Erzählen Sie Francessca, was passiert ist",
+  "home.step1Title": "Erzählen Sie Francesca, was passiert ist",
   "home.step1Body": "Sie stellt die richtigen Fragen — eine nach der anderen, in Ihrer Sprache, ohne Juristendeutsch.",
   "home.step2Title": "Dokumente hinzufügen",
   "home.step2Body": "Laden Sie Briefe und Verträge hoch. Der Text wird automatisch ausgelesen, jedes Datum landet in Ihrer Zeitleiste.",
@@ -75,7 +75,7 @@ const de: Record<TranslationKey, string> = {
   "home.submitting": "Wird gesendet…",
 
   "common.disclaimer":
-    "Francessca ist keine Anwältin und bietet keine Rechtsberatung. Lassen Sie Dokumente stets von einem qualifizierten Anwalt prüfen.",
+    "Francesca ist keine Anwältin und bietet keine Rechtsberatung. Lassen Sie Dokumente stets von einem qualifizierten Anwalt prüfen.",
   "common.loading": "Wird geladen…",
 
   "login.titleLogin": "Anmelden",
@@ -97,14 +97,14 @@ const de: Record<TranslationKey, string> = {
   "chat.exportDone": "PDF der Fallzusammenfassung heruntergeladen.",
   "chat.emptyPrompt":
     "Erzählen Sie mir, was passiert ist. Zum Beispiel: „Ich wurde gestern gekündigt.“",
-  "chat.typing": "Francessca schreibt…",
+  "chat.typing": "Francesca schreibt…",
   "chat.attachDocuments": "Dokumente anhängen:",
   "chat.typeMessage": "Nachricht eingeben…",
   "chat.send": "Senden",
 
   "files.title": "Dokumente",
   "files.subtitle":
-    "Laden Sie PDF-, Bild-, DOCX- oder TXT-Dateien hoch (max. {{maxMb}} MB). Text wird automatisch extrahiert — einschließlich OCR für Bilder —, damit Francessca ihn nutzen kann.",
+    "Laden Sie PDF-, Bild-, DOCX- oder TXT-Dateien hoch (max. {{maxMb}} MB). Text wird automatisch extrahiert — einschließlich OCR für Bilder —, damit Francesca ihn nutzen kann.",
   "files.uploadButton": "Dokument hochladen",
   "files.uploading": "Wird hochgeladen…",
   "files.textExtracted": "Text extrahiert",
@@ -133,7 +133,7 @@ const de: Record<TranslationKey, string> = {
 
   "timeline.title": "Fallzeitleiste",
   "timeline.loadingTimeline": "Zeitleiste wird geladen…",
-  "timeline.subtitle": "Termine, Anhörungen, Fristen und Ablaufdaten, die Francessca in Ihren Dokumenten und Nachrichten findet — jeweils mit Link zur Quelle.",
+  "timeline.subtitle": "Termine, Anhörungen, Fristen und Ablaufdaten, die Francesca in Ihren Dokumenten und Nachrichten findet — jeweils mit Link zur Quelle.",
   "timeline.noEvents": "Noch keine Termine. Laden Sie ein Dokument hoch oder erwähnen Sie im Chat etwas Terminliches — einen Termin, eine Frist, ein Ablaufdatum — und es erscheint hier.",
   "timeline.delete": "Löschen",
   "timeline.deleting": "Wird gelöscht…",

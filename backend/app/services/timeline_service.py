@@ -17,7 +17,7 @@ summary, not in a calendar. Three filters enforce that:
    server-side, so a chatty model cannot pollute the timeline.
 
 Extraction is strictly best-effort:
-- it reuses the mandatory Francessca system prompt, so the same "no legal
+- it reuses the mandatory Francesca system prompt, so the same "no legal
   advice / no predictions" guardrails apply to this call as to any other;
 - it never invents facts — only entries actually stated in the text;
 - it never raises. A failure (bad JSON, no budget left, network error) is
@@ -227,7 +227,8 @@ class TimelineService:
 
         try:
             estimated = estimate_tokens(text) + 300
-            if not user.is_unlimited and estimated > (self.tokens.remaining(user) or 0):
+            remaining = self.tokens.remaining(user)
+            if remaining is not None and estimated > remaining:
                 log.info("timeline extraction skipped: token budget exhausted")
                 return []
 

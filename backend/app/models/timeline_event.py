@@ -1,6 +1,6 @@
 """Timeline event model.
 
-Timeline events are facts with a date (or approximate date) that Francessca
+Timeline events are facts with a date (or approximate date) that Francesca
 automatically extracts from uploaded documents and chat messages — the
 chronological "case timeline" that would otherwise have to be assembled by
 hand. Extraction is best-effort and never contains legal conclusions, only
@@ -48,6 +48,10 @@ class TimelineEvent(Base):
     )
     # id of the Document or Message this event was extracted from.
     source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Deadline reminders already sent (email + in-app), so each goes once.
+    reminded_7d_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminded_1d_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

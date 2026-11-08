@@ -55,4 +55,4 @@ python3 -m PyInstaller --noconfirm --clean \
   "$HERE/francessca.spec"
 
 echo
-echo "Done: $HERE/dist/Francessca"
+echo "Done: $HERE/dist/Francesca"

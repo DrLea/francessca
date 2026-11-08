@@ -31,6 +31,9 @@ class OrderStatus(str, enum.Enum):
     accepted = "accepted"  # lawyer took it; contact details revealed
     declined = "declined"
     cancelled = "cancelled"  # withdrawn by the client before a response
+    # The client took back their consent after the lawyer had seen it: the
+    # lawyer loses access to the case file and the client's contact.
+    withdrawn = "withdrawn"
     closed_won = "closed_won"  # lawyer and client made a deal
     closed_lost = "closed_lost"  # accepted, but nothing came of it
 
@@ -75,10 +78,15 @@ class Order(Base):
     quality_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     quality_breakdown: Mapped[dict] = mapped_column(JSONType, default=dict)
 
-    # Set when the lawyer accepts: whether it came out of the free allowance.
+    # Set when the lawyer accepts: whether the firm was in its free trial.
     is_free: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # What the lawyer says the deal was worth (their own bookkeeping).
     deal_value: Mapped[float | None] = mapped_column(Numeric(12, 2))
+
+    # Per-case consent: when the client agreed to share exactly this case
+    # with exactly this lawyer, and when (if ever) they took it back.
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consent_withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

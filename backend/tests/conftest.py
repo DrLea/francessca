@@ -57,7 +57,7 @@ class FakeAI:
     def complete(self, *, system_prompt, messages, max_tokens=1024):  # noqa: ANN001
         from app.services.ai_service import AIResult
 
-        assert "Francessca" in system_prompt  # guardrail prompt always present
+        assert "Francesca" in system_prompt  # guardrail prompt always present
         return AIResult(
             text=self.reply, input_tokens=50, output_tokens=20, model=self.model
         )

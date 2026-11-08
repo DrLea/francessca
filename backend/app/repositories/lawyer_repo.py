@@ -33,10 +33,11 @@ class LawyerRepository(BaseRepository[Lawyer]):
         stmt = (
             select(Lawyer)
             .options(selectinload(Lawyer.specializations))
-            .where(Lawyer.is_published.is_(True))
+            .where(Lawyer.is_published.is_(True), Lawyer.suspended_at.is_(None))
         )
         count_stmt = select(func.count(func.distinct(Lawyer.id))).where(
-            Lawyer.is_published.is_(True)
+            Lawyer.is_published.is_(True),
+            Lawyer.suspended_at.is_(None),
         )
 
         if specialization:

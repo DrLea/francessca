@@ -13,21 +13,31 @@ def test_estimate_tokens_scales_with_length():
     assert estimate_tokens("a" * 40) == 10
 
 
-def test_limit_blocks_when_exceeded(db_session):
-    user = User(
-        email="u@example.com", tier=UserTier.free, token_limit=100, tokens_used=90
-    )
+def test_fair_use_cap_blocks_within_24h(db_session):
+    user = User(email="u@example.com", tier=UserTier.free, token_limit=100, tokens_used=0)
     db_session.add(user)
     db_session.flush()
     svc = TokenService(db_session)
+    svc.record(user, input_tokens=60, output_tokens=30, model="x")
+    db_session.flush()
+    assert svc.used_today(user) == 90
     assert svc.remaining(user) == 10
     with pytest.raises(HTTPException) as exc:
         svc.ensure_within_limit(user, estimated=50)
-    assert exc.value.status_code == 402
+    assert exc.value.status_code == 429
+
+
+def test_default_cap_applies_when_no_override(db_session):
+    from app.config import settings
+
+    user = User(email="d@example.com", tier=UserTier.free, token_limit=None)
+    db_session.add(user)
+    db_session.flush()
+    assert TokenService(db_session).daily_limit(user) == settings.fair_use_daily_tokens
 
 
 def test_unlimited_premium_never_blocked(db_session):
-    user = User(email="p@example.com", tier=UserTier.premium, token_limit=None)
+    user = User(email="p@example.com", tier=UserTier.premium, token_limit=50)
     db_session.add(user)
     db_session.flush()
     svc = TokenService(db_session)

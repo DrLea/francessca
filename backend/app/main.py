@@ -26,6 +26,7 @@ from app.api.routes import (
     meta,
     orders,
     public,
+    reports,
 )
 from app.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -36,10 +37,10 @@ log = get_logger("francessca.app")
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 app = FastAPI(
-    title="Francessca API",
+    title="Francesca API",
     version="0.1.0",
     description=(
-        "Francessca helps users prepare for speaking with a qualified lawyer. "
+        "Francesca helps users prepare for speaking with a qualified lawyer. "
         "It is NOT a legal consultation platform and does not provide legal advice."
     ),
 )
@@ -104,6 +105,7 @@ for router in (
     admin,
     meta,
     public,
+    reports,
 ):
     app.include_router(router.router, prefix=API_PREFIX)
 

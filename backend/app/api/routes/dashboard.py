@@ -48,8 +48,8 @@ def dashboard(
         cases=case_count,
         exports=export_count,
         timeline_events=timeline_count,
-        tokens_used=user.tokens_used,
-        token_limit=user.token_limit,
+        tokens_used=TokenService(db).used_today(user),
+        token_limit=TokenService(db).daily_limit(user),
     )
 
 
@@ -57,10 +57,11 @@ def dashboard(
 def usage(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> UsageOut:
-    remaining = TokenService(db).remaining(user)
+    tokens = TokenService(db)
+    remaining = tokens.remaining(user)
     return UsageOut(
-        token_limit=user.token_limit,
-        tokens_used=user.tokens_used,
+        token_limit=tokens.daily_limit(user),
+        tokens_used=tokens.used_today(user),
         tokens_remaining=remaining,
         tier=user.tier.value,
     )

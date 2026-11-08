@@ -1,4 +1,4 @@
-# Francessca backend image
+# Francesca backend image
 FROM python:3.12-slim
 
 # System deps: tesseract for OCR, build essentials for some wheels

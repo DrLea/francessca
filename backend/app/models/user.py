@@ -17,6 +17,9 @@ class UserRole(str, enum.Enum):
 
 
 class UserTier(str, enum.Enum):
+    # Francesca is free for people: there is nothing to buy. "premium" only
+    # lifts the hidden fair-use cap and is set by an admin (staff, partner
+    # pilots). The enum keeps its old name so no DB migration is needed.
     free = "free"
     premium = "premium"
 
@@ -38,9 +41,17 @@ class User(Base):
         Enum(UserTier, name="user_tier"), default=UserTier.free, nullable=False
     )
 
-    # Monthly token allowance. NULL means unlimited (premium).
+    # Per-user override of the daily fair-use cap; NULL = the default
+    # (FAIR_USE_DAILY_TOKENS). tokens_used is a lifetime total for stats.
     token_limit: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     tokens_used: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+
+    # Explicit consent to keep this account's case data on Francesca's
+    # servers in Germany (GDPR Art. 6(1)(a), 9(2)(a)). Without it the
+    # offline app is the way to use Francesca.
+    data_consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -61,4 +72,4 @@ class User(Base):
 
     @property
     def is_unlimited(self) -> bool:
-        return self.tier == UserTier.premium or self.token_limit is None
+        return self.tier == UserTier.premium

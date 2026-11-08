@@ -103,23 +103,11 @@ def test_application_requires_a_real_email(client):
     assert bad.status_code == 422
 
 
-def test_plan_switch_is_free_during_beta(client):
+def test_people_have_no_plans_to_buy(client):
+    """Francesca is free for people: the old plan switch is gone."""
     token = _register(client, email="plan@example.com")
     headers = {"Authorization": f"Bearer {token}"}
-    assert client.get("/me", headers=headers).json()["tier"] == "free"
-
-    upgraded = client.post("/me/plan", headers=headers, json={"tier": "premium"})
-    assert upgraded.status_code == 200, upgraded.text
-    assert upgraded.json()["tier"] == "premium"
-    assert upgraded.json()["token_limit"] is None  # unlimited
-
-    back = client.post("/me/plan", headers=headers, json={"tier": "free"})
-    assert back.json()["tier"] == "free"
-    assert back.json()["token_limit"] == 100_000
-
-
-def test_plan_switch_requires_a_login(client):
-    assert client.post("/me/plan", json={"tier": "premium"}).status_code == 401
+    assert client.post("/me/plan", headers=headers, json={"tier": "premium"}).status_code in (404, 405)
 
 
 def test_local_ai_service_speaks_openai_chat_completions(monkeypatch):
@@ -152,7 +140,7 @@ def test_local_ai_service_speaks_openai_chat_completions(monkeypatch):
     monkeypatch.setattr(httpx, "post", _fake_post)
     service = LocalAIService(base_url="http://127.0.0.1:8757/v1", model="local")
     result = service.complete(
-        system_prompt="You are Francessca.",
+        system_prompt="You are Francesca.",
         messages=[{"role": "user", "content": "Hallo"}],
         max_tokens=256,
     )
@@ -161,7 +149,7 @@ def test_local_ai_service_speaks_openai_chat_completions(monkeypatch):
     # The system prompt stays in its own turn, exactly as with the hosted API.
     assert captured["json"]["messages"][0] == {
         "role": "system",
-        "content": "You are Francessca.",
+        "content": "You are Francesca.",
     }
     assert result.text == "Hallo."
     assert (result.input_tokens, result.output_tokens) == (11, 3)
@@ -247,7 +235,7 @@ def test_a_locally_hosted_build_is_served_and_hashed(client, tmp_path, monkeypat
 
     from app.config import settings
 
-    exe = tmp_path / "Francessca.exe"
+    exe = tmp_path / "Francesca.exe"
     exe.write_bytes(b"MZ fake windows build")
     monkeypatch.setattr(settings, "download_dir", str(tmp_path))
     # A configured external URL loses to the local copy.
@@ -265,7 +253,7 @@ def test_a_locally_hosted_build_is_served_and_hashed(client, tmp_path, monkeypat
     got = client.get("/public/download/windows")
     assert got.status_code == 200
     assert got.content == b"MZ fake windows build"
-    assert "Francessca.exe" in got.headers["content-disposition"]
+    assert "Francesca.exe" in got.headers["content-disposition"]
 
 
 def test_downloads_reject_anything_but_the_known_platforms(client, tmp_path, monkeypatch):

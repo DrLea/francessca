@@ -1,4 +1,4 @@
-# Francessca frontend image (Next.js, standalone output)
+# Francesca frontend image (Next.js, standalone output)
 
 # 1. Install dependencies (incl. devDeps needed to build)
 FROM node:20-alpine AS deps

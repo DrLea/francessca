@@ -21,8 +21,9 @@ from app.schemas.portal import (
     LawyerOrderOut,
     OrderClientRef,
     OrderLawyerRef,
-    QuotaOut,
     ReviewOut,
+    SubscriptionOut,
+    VerificationOut,
 )
 
 PROFILE_FIELDS = (
@@ -50,27 +51,30 @@ class OrderService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    # --- Quota ----------------------------------------------------------
-    def used_orders(self, lawyer_id: int) -> int:
-        return (
-            self.db.scalar(
-                select(func.count())
-                .select_from(Order)
-                .where(Order.lawyer_id == lawyer_id, Order.status.in_(BILLABLE_STATUSES))
-            )
-            or 0
+    # --- Subscription ---------------------------------------------------
+    @staticmethod
+    def subscription(lawyer: Lawyer) -> SubscriptionOut:
+        state = lawyer.subscription_state()
+        return SubscriptionOut(
+            state=state,
+            can_accept=state in ("trial", "active") and not lawyer.is_suspended,
+            trial_ends_at=lawyer.trial_ends_at,
+            paid_until=lawyer.paid_until,
+            monthly_fee=settings.lawyer_monthly_fee,
+            trial_months=settings.lawyer_trial_months,
+            contact_email=settings.contact_email or None,
         )
 
-    def quota(self, lawyer: Lawyer) -> QuotaOut:
-        free = max(0, settings.lawyer_free_orders)
-        used = self.used_orders(lawyer.id)
-        return QuotaOut(
-            free_total=free,
-            extra=lawyer.extra_orders,
-            used=used,
-            remaining=max(0, free + lawyer.extra_orders - used),
-            free_remaining=max(0, free - used),
-            contact_email=settings.contact_email or None,
+    @staticmethod
+    def verification(lawyer: Lawyer) -> VerificationOut:
+        return VerificationOut(
+            register_checked=lawyer.brak_checked_at is not None,
+            bea_verified=lawyer.bea_verified_at is not None,
+            bea_code_sent=lawyer.bea_code_sent_at is not None,
+            id_check_status=lawyer.id_check_status,
+            verified_until=lawyer.verified_until,
+            is_verified=lawyer.is_verified,
+            is_suspended=lawyer.is_suspended,
         )
 
     # --- Queries --------------------------------------------------------
@@ -102,14 +106,16 @@ class OrderService:
 
     def to_lawyer(self, order: Order) -> LawyerOrderOut:
         revealed = order.status in BILLABLE_STATUSES
+        withdrawn = order.status == OrderStatus.withdrawn.value
         client = order.client
         return LawyerOrderOut(
             id=order.id,
             status=order.status,
             case_title=order.case_title,
             case_type=order.case_type,
-            case_summary=order.case_summary or {},
-            message=order.message,
+            # Consent taken back: the lawyer keeps the record, not the file.
+            case_summary={} if withdrawn else (order.case_summary or {}),
+            message=None if withdrawn else order.message,
             quality_score=order.quality_score,
             quality_breakdown=order.quality_breakdown or {},
             is_free=order.is_free,
@@ -210,7 +216,6 @@ class OrderService:
                     buckets[closed_key]["won"] += 1
                     buckets[closed_key]["revenue"] += float(order.deal_value or 0)
 
-        free_total = max(0, settings.lawyer_free_orders)
         scored = [o.quality_score for o in orders if o.status != OrderStatus.cancelled.value]
         return {
             "orders": {
@@ -236,10 +241,8 @@ class OrderService:
                 "revenue": round(revenue, 2),
                 "deals": won,
                 "avg_deal": round(revenue / len(valued), 2) if valued else None,
-                "free_orders_used": min(accepted, free_total),
-                "paid_orders_used": max(0, accepted - free_total),
-                # Nothing is charged yet; kept explicit so the page can say so.
-                "platform_fees": 0.0,
+                # Flat fee, never per client: the leads themselves cost nothing.
+                "subscription": self.subscription(lawyer).model_dump(mode="json"),
             },
             "monthly": list(buckets.values()),
         }

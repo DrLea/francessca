@@ -16,7 +16,7 @@ from app.core.logging import get_logger
 log = get_logger("francessca.email")
 
 _FOOTER = (
-    "\n\n--\nFrancessca helps people prepare before they speak with a lawyer. "
+    "\n\n--\nFrancesca helps people prepare before they speak with a lawyer. "
     "It does not provide legal advice."
 )
 
@@ -73,7 +73,7 @@ def lawyer_decision(email: str, name: str, approved: bool) -> None:
     if approved:
         send_email(
             email,
-            "Your Francessca profile is live",
+            "Your Francesca profile is live",
             f"Hello {name},\n\nyour profile has been approved and now appears in the "
             f"directory. Your first {settings.lawyer_free_orders} orders are free.\n\n"
             f"Open your portal: {_url('/lawyer')}",
@@ -81,7 +81,7 @@ def lawyer_decision(email: str, name: str, approved: bool) -> None:
     else:
         send_email(
             email,
-            "About your Francessca application",
+            "About your Francesca application",
             f"Hello {name},\n\nwe could not approve your profile at this time. "
             "Reply to this email if you think this is a mistake.",
         )
@@ -90,7 +90,7 @@ def lawyer_decision(email: str, name: str, approved: bool) -> None:
 def new_order_lawyer(email: str | None, name: str, title: str, score: int) -> None:
     send_email(
         email,
-        "New case request on Francessca",
+        "New case request on Francesca",
         f"Hello {name},\n\na client sent you their prepared case: \"{title}\" "
         f"(lead quality {score}/100).\n\nReview and accept or decline it: "
         f"{_url('/lawyer')}",
@@ -120,4 +120,25 @@ def new_feedback_admin(lawyer_name: str, category: str, comment: str) -> None:
         settings.contact_email,
         f"Lawyer feedback ({category}) from {lawyer_name}",
         f"{comment}\n\nAll feedback: {_url('/admin/feedback')}",
+    )
+
+
+def lawyer_reported_admin(to: str, lawyer_name: str, reason: str, suspended: bool) -> None:
+    send_email(
+        to,
+        f"Lawyer reported: {lawyer_name}" + (" (auto-suspended)" if suspended else ""),
+        f"A user reported {lawyer_name} (reason: {reason}).\n"
+        + ("The lawyer was suspended automatically and is hidden from the directory.\n"
+           if suspended else "")
+        + f"Review: {_url('/admin/lawyers')}",
+    )
+
+
+def deadline_reminder(to: str, description: str, when: str, days_left: int) -> None:
+    lead = "tomorrow" if days_left <= 1 else f"in {days_left} days"
+    send_email(
+        to,
+        f"Reminder: {description[:60]} ({when})",
+        f"A date in your Francesca timeline is {lead}:\n\n  {when}: {description}\n\n"
+        f"Open your timeline: {_url('/timeline')}",
     )

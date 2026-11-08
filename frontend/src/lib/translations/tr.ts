@@ -11,7 +11,7 @@ const tr: Record<TranslationKey, string> = {
   "nav.langSwitcherTitle": "Sohbet, dışa aktarımlar ve formlar bu dili kullanacak",
 
   "home.tagline":
-    "Bir avukatla konuşmadan önce hazırlıklı olun. Francessca doğru soruları sorar, bilgilerinizi toplar, standart formları doldurmanıza yardımcı olur ve Almanya'da yetkin bir avukata verebileceğiniz yapılandırılmış bir özet hazırlar.",
+    "Bir avukatla konuşmadan önce hazırlıklı olun. Francesca doğru soruları sorar, bilgilerinizi toplar, standart formları doldurmanıza yardımcı olur ve Almanya'da yetkin bir avukata verebileceğiniz yapılandırılmış bir özet hazırlar.",
   "home.getStarted": "Başlayın",
   "home.findLawyer": "Avukat bulun",
 
@@ -26,7 +26,7 @@ const tr: Record<TranslationKey, string> = {
   "home.betaBadge": "Beta boyunca ücretsiz",
   "home.openChat": "Sohbeti aç",
   "home.stepsTitle": "Nasıl çalışır",
-  "home.step1Title": "Francessca'ya ne olduğunu anlatın",
+  "home.step1Title": "Francesca'ya ne olduğunu anlatın",
   "home.step1Body": "Doğru soruları teker teker, kendi dilinizde sorar — hukuk jargonu yok.",
   "home.step2Title": "Belgelerinizi ekleyin",
   "home.step2Body": "Mektup ve sözleşmeleri yükleyin. Metin otomatik çıkarılır, her tarih zaman çizelgenize düşer.",
@@ -42,7 +42,7 @@ const tr: Record<TranslationKey, string> = {
   "home.checksums": "İndirdiğinizi doğrulamak için SHA-256 sağlama toplamları:",
   "home.download": "{{platform}} için indir",
   "home.pricingTitle": "Planlar",
-  "home.pricingBeta": "Francessca beta aşamasındayken her şey ücretsiz — kart yok, ödeme yok.",
+  "home.pricingBeta": "Francesca beta aşamasındayken her şey ücretsiz — kart yok, ödeme yok.",
   "home.planFree": "Ücretsiz",
   "home.planFreePrice": "0 €",
   "home.planFreeF1": "8 dilde yönlendirilmiş sorular",
@@ -75,7 +75,7 @@ const tr: Record<TranslationKey, string> = {
   "home.submitting": "Gönderiliyor…",
 
   "common.disclaimer":
-    "Francessca bir avukat değildir ve hukuki tavsiye vermez. Belgeleri her zaman yetkin bir avukata inceletin.",
+    "Francesca bir avukat değildir ve hukuki tavsiye vermez. Belgeleri her zaman yetkin bir avukata inceletin.",
   "common.loading": "Yükleniyor…",
 
   "login.titleLogin": "Giriş yap",
@@ -96,14 +96,14 @@ const tr: Record<TranslationKey, string> = {
   "chat.generating": "Oluşturuluyor…",
   "chat.exportDone": "Dava özeti PDF'i indirildi.",
   "chat.emptyPrompt": "Ne olduğunu anlatın. Örneğin: “Dün işten çıkarıldım.”",
-  "chat.typing": "Francessca yazıyor…",
+  "chat.typing": "Francesca yazıyor…",
   "chat.attachDocuments": "Belge ekle:",
   "chat.typeMessage": "Mesajınızı yazın…",
   "chat.send": "Gönder",
 
   "files.title": "Belgeler",
   "files.subtitle":
-    "PDF, görsel, DOCX veya TXT dosyaları yükleyin (en fazla {{maxMb}} MB). Francessca'nın kullanabilmesi için metin otomatik olarak çıkarılır — görseller için OCR dahil.",
+    "PDF, görsel, DOCX veya TXT dosyaları yükleyin (en fazla {{maxMb}} MB). Francesca'nın kullanabilmesi için metin otomatik olarak çıkarılır — görseller için OCR dahil.",
   "files.uploadButton": "Belge yükle",
   "files.uploading": "Yükleniyor…",
   "files.textExtracted": "Metin çıkarıldı",
@@ -132,7 +132,7 @@ const tr: Record<TranslationKey, string> = {
 
   "timeline.title": "Dava zaman çizelgesi",
   "timeline.loadingTimeline": "Zaman çizelgesi yükleniyor…",
-  "timeline.subtitle": "Francessca'nın belgelerinizde ve mesajlarınızda bulduğu randevular, duruşmalar, son tarihler ve geçerlilik bitiş tarihleri — her biri kaynağına bağlantılı.",
+  "timeline.subtitle": "Francesca'nın belgelerinizde ve mesajlarınızda bulduğu randevular, duruşmalar, son tarihler ve geçerlilik bitiş tarihleri — her biri kaynağına bağlantılı.",
   "timeline.noEvents": "Henüz tarih yok. Bir belge yükleyin veya sohbette planlı bir şeyden söz edin — bir randevu, son tarih ya da geçerlilik bitişi — burada görünecektir.",
   "timeline.delete": "Sil",
   "timeline.deleting": "Siliniyor…",

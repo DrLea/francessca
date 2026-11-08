@@ -56,6 +56,6 @@ def get_lawyer(
     db: Session = Depends(get_db),
 ) -> LawyerOut:
     lawyer = LawyerRepository(db).get(lawyer_id)
-    if lawyer is None or not lawyer.is_published:
+    if lawyer is None or not lawyer.is_published or lawyer.is_suspended:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return LawyerOut.model_validate(lawyer)

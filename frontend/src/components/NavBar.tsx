@@ -83,7 +83,7 @@ export function NavBar() {
           className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-slate-900"
         >
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
-          Francessca
+          Francesca
           {onLawyerSide && (
             <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
               {t("nav.forLawyers")}

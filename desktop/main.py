@@ -1,4 +1,4 @@
-"""Francessca desktop launcher.
+"""Francesca desktop launcher.
 
 One process, one port, nothing leaves the machine:
 
@@ -33,7 +33,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-APP_NAME = "Francessca"
+APP_NAME = "Francesca"
 API_HOST = "127.0.0.1"
 API_PORT = int(os.environ.get("FRANCESSCA_PORT", "8756"))
 LLAMA_PORT = int(os.environ.get("FRANCESSCA_LLAMA_PORT", "8757"))
@@ -351,7 +351,7 @@ def main() -> int:
             target=lambda: (wait_for_port(API_PORT, 30), webbrowser.open(url)),
             daemon=True,
         ).start()
-        print(f"\nFrancessca is running at {url}\nClose this window to stop it.\n")
+        print(f"\nFrancesca is running at {url}\nClose this window to stop it.\n")
         uvicorn.run(app, host=API_HOST, port=API_PORT, log_level="warning")
     except KeyboardInterrupt:
         pass

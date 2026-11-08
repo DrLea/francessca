@@ -9,7 +9,7 @@ Two interchangeable backends, both returning an `AIResult`:
   instruct model), so nothing leaves the user's machine at all.
 
 `build_ai_service()` picks between them from `AI_PROVIDER`. Every call
-prepends the mandatory Francessca system prompt and keeps untrusted user
+prepends the mandatory Francesca system prompt and keeps untrusted user
 content in user turns, separate from system instructions — identical on
 both backends.
 """

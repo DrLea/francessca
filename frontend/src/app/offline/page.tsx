@@ -159,7 +159,7 @@ export default function OfflinePage() {
     setError(null);
     try {
       const transcript = messages
-        .map((m) => `${m.role === "user" ? t("off.me") : "Francessca"}: ${m.content}`)
+        .map((m) => `${m.role === "user" ? t("off.me") : "Francesca"}: ${m.content}`)
         .join("\n\n");
       await api.sendMessage({ message: `${t("off.syncIntro")}\n\n${transcript}` });
       setSynced(true);

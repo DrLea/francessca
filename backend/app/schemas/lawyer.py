@@ -30,6 +30,8 @@ class LawyerOut(BaseModel):
     rating_count: int = 0
     # True when the lawyer has an account, so a case can be sent in-app.
     accepts_requests: bool = False
+    # Register + beA + ID checked within the last year (see verification_service).
+    is_verified: bool = False
 
     @field_validator("languages", mode="before")
     @classmethod

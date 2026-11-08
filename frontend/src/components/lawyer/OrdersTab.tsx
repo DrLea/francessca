@@ -69,7 +69,7 @@ function Paywall({ me, onClose }: { me: LawyerMe; onClose: () => void }) {
         {email && (
           <a
             href={`mailto:${email}?subject=${encodeURIComponent(
-              `Francessca: more orders for ${me.profile.name}`,
+              `Francesca: more orders for ${me.profile.name}`,
             )}`}
           >
             <Button>{t("lp.paywall.cta")}</Button>

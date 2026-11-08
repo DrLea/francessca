@@ -1,6 +1,6 @@
-# Francessca
+# Francesca
 
-Francessca is **not** a legal consultation platform and does **not** give legal advice. It is an AI assistant that helps users prepare for speaking with a qualified lawyer: it asks clarifying questions, collects the facts chronologically, helps fill publicly-available forms, produces a structured case summary, recommends German lawyers, and lets users contact them.
+Francesca is **not** a legal consultation platform and does **not** give legal advice. It is an AI assistant that helps users prepare for speaking with a qualified lawyer: it asks clarifying questions, collects the facts chronologically, helps fill publicly-available forms, produces a structured case summary, recommends German lawyers, and lets users contact them.
 
 Every AI request is prepended with a mandatory system prompt that forbids legal advice, predictions, or representation as a lawyer, and every generated document ends with a recommendation to have it reviewed by a qualified lawyer.
 
@@ -131,7 +131,7 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 
 ## Guided clarifying questions
 
-Francessca's job is to ask the right questions, but a paragraph full of them gets one answer at best. So when the model needs facts it appends a machine-readable block to its reply instead of asking in prose (the protocol lives in `app/core/clarify.py` and is appended to the mandatory system prompt on every chat turn, alongside the language instruction):
+Francesca's job is to ask the right questions, but a paragraph full of them gets one answer at best. So when the model needs facts it appends a machine-readable block to its reply instead of asking in prose (the protocol lives in `app/core/clarify.py` and is appended to the mandatory system prompt on every chat turn, alongside the language instruction):
 
 ```
 <questions>
@@ -153,7 +153,7 @@ serving a local GGUF model instead of the Anthropic API, and the statically
 exported frontend served by FastAPI itself — one process, one port.
 
 ```
-Francessca.exe
+Francesca.exe
   ├── llama.cpp server   127.0.0.1:8757
   └── FastAPI + uvicorn  127.0.0.1:8756   API and UI
 ```
@@ -175,7 +175,7 @@ publish the result through the landing page's `DOWNLOAD_*` variables.
 
 - **Directory preview** comes from `GET /public/lawyers`, which returns name, firm, city, specializations and languages only — email, phone and address stay behind the login on `/lawyers`.
 - **Desktop downloads** come from `GET /public/downloads`, which reads the `DOWNLOAD_*` variables at request time — publishing a release is an `.env` change plus a backend restart, with no frontend rebuild. Checksums are shown under the buttons when set, since the executables are unsigned. While the variables are empty the whole section is hidden rather than showing dead links.
-- **Plans** are Free and Premium. `POST /me/plan` moves a user between them with no payment step — Francessca is in beta, so Premium simply lifts the monthly token limit. **Put a payment provider in front of that endpoint before charging anyone.**
+- **Plans** are Free and Premium. `POST /me/plan` moves a user between them with no payment step — Francesca is in beta, so Premium simply lifts the monthly token limit. **Put a payment provider in front of that endpoint before charging anyone.**
 - **Lawyer sign-up** posts to `POST /public/lawyer-applications` and is stored as `pending` in `lawyer_applications` (migration `0004`). Nothing submitted there is visible anywhere until an admin calls `/admin/lawyer-applications/{id}/approve`, which creates the directory entry with a `source_key` of `application:<id>` so a later scraper sync can never overwrite or delete it. Rejected applications are kept for the record and never published.
 
 ## Case timeline
@@ -190,7 +190,7 @@ A chat message is extracted together with the previous assistant turn as context
 
 Every entry keeps the document or conversation it came from (`source_type` + `source_id`/`conversation_id`); `GET /case/timeline` resolves that to a filename or conversation title, and the UI links straight through to `/files?doc=<id>` or `/chat?c=<id>`. Entries the user doesn't want are removable with `DELETE /case/timeline/{id}`.
 
-Only dated entries are returned, which also hides rows left over from the earlier, looser extractor without a data migration. Extraction still reuses the mandatory Francessca system prompt (same no-advice guardrails), never invents dates, and never blocks the upload/chat flow — a parse failure, network error, or exhausted token budget is logged and yields zero entries. The timeline feeds case-summary generation (`CaseService`) and gets its own dated section in the exported PDF (`ExportService`). Each extraction is a real Claude call; for production it's worth moving to a background task so it doesn't add latency to the request path.
+Only dated entries are returned, which also hides rows left over from the earlier, looser extractor without a data migration. Extraction still reuses the mandatory Francesca system prompt (same no-advice guardrails), never invents dates, and never blocks the upload/chat flow — a parse failure, network error, or exhausted token budget is logged and yields zero entries. The timeline feeds case-summary generation (`CaseService`) and gets its own dated section in the exported PDF (`ExportService`). Each extraction is a real Claude call; for production it's worth moving to a background task so it doesn't add latency to the request path.
 
 ## Multilingual conversation, exports & forms
 
@@ -259,4 +259,4 @@ The architecture is intentionally modular so you can add lawyer accounts, paid s
 
 ## Disclaimer
 
-Francessca organizes information and helps prepare documents. It does not provide legal advice, does not predict outcomes, and is not a substitute for a qualified lawyer.
+Francesca organizes information and helps prepare documents. It does not provide legal advice, does not predict outcomes, and is not a substitute for a qualified lawyer.
