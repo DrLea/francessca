@@ -83,8 +83,9 @@ class Settings(BaseSettings):
     # 32 random bytes, base64. Generate: python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
     # If empty, a key is derived from JWT_SECRET (fine for development only).
     data_encryption_key: str = Field("", alias="DATA_ENCRYPTION_KEY")
-    # Deadline reminders: days before a deadline to remind (email + in-app).
-    reminder_days: str = Field("7,1", alias="REMINDER_DAYS")
+    # Deadline reminders (7 days and 1 day before, email + in-app): the
+    # hourly background check. Off in tests.
+    reminders_enabled: bool = Field(True, alias="REMINDERS_ENABLED")
     # Shown on that screen, and where lawyer sign-ups / feedback are mailed.
     # Falls back to ADMIN_EMAIL.
     support_email: str = Field("", alias="SUPPORT_EMAIL")

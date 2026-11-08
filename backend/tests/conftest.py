@@ -7,6 +7,7 @@ import os
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET", "test-secret-please-change")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("REMINDERS_ENABLED", "false")
 
 import pytest
 from fastapi.testclient import TestClient

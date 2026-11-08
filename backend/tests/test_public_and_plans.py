@@ -19,7 +19,7 @@ APPLICATION = {
 def _register(client, email="user@example.com", **extra):
     resp = client.post(
         "/auth/register",
-        json={"email": email, "password": "password123", "full_name": "Test", **extra},
+        json={"email": email, "password": "password123", "full_name": "Test", "data_consent": True, **extra},
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["access_token"]

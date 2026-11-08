@@ -517,6 +517,14 @@ def rechecks_due(
     return [_row_for(db, lw) for lw in rows]
 
 
+@router.post("/reminders/run")
+def run_reminders(_: User = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    """Send due deadline reminders now (they also run hourly by themselves)."""
+    from app.services.reminder_service import send_due_reminders
+
+    return {"sent": send_due_reminders(db)}
+
+
 # --- User reports ---------------------------------------------------------
 @router.get("/reports", response_model=list[ReportOut])
 def list_reports(

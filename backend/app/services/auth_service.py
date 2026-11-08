@@ -1,6 +1,8 @@
 """Authentication service: registration, login, Google OAuth."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import httpx
 from fastapi import HTTPException, status
 from google.auth.transport import requests as google_requests
@@ -38,6 +40,7 @@ class AuthService:
             language=data.language,
             tier=UserTier.free,
             token_limit=self._default_limit(),
+            data_consent_at=datetime.now(timezone.utc) if data.data_consent else None,
         )
         self.users.add(user)
         self.users.commit()

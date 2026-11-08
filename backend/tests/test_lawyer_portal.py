@@ -31,7 +31,7 @@ def _auth(token: str) -> dict:
 
 def _client(client, email="client@example.com") -> str:
     resp = client.post(
-        "/auth/register", json={"email": email, "password": "password123", "full_name": "Cli Ent"}
+        "/auth/register", json={"email": email, "password": "password123", "full_name": "Cli Ent", "data_consent": True}
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["access_token"]

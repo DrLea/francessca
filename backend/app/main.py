@@ -45,6 +45,16 @@ app = FastAPI(
     ),
 )
 
+@app.on_event("startup")
+async def _start_reminders() -> None:
+    import asyncio
+
+    from app.services.reminder_service import reminder_loop
+
+    if settings.reminders_enabled:
+        app.state.reminder_task = asyncio.create_task(reminder_loop())
+
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

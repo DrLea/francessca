@@ -9,11 +9,25 @@ from sqlalchemy.orm import Session
 
 from app.core.languages import SUPPORTED_LANGUAGES
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_data_consent
 from app.models.user import User
 from app.repositories.document_repo import DocumentRepository
 from app.schemas.common import DocumentOut, MessageResponse
 from app.services.file_service import FileService
+
+
+
+def _decrypted_response(path: str, media_type: str, filename: str) -> Response:
+    """Files are encrypted at rest; decrypt in memory for the owner."""
+    from urllib.parse import quote
+
+    from app.core.crypto import read_decrypted
+
+    return Response(
+        content=read_decrypted(path),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -32,7 +46,7 @@ def _to_out(doc) -> DocumentOut:
 @router.post("", response_model=DocumentOut)
 def upload_file(
     file: UploadFile,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> DocumentOut:
     doc = FileService(db).save_upload(user, file)
@@ -52,14 +66,14 @@ def download_file(
     document_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """Download the original, as-uploaded file."""
     doc = FileService(db).get_owned(document_id, user.id)
     if not os.path.exists(doc.stored_path):
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail="File no longer available"
         )
-    return FileResponse(doc.stored_path, media_type=doc.mime, filename=doc.filename)
+    return _decrypted_response(doc.stored_path, doc.mime, doc.filename)
 
 
 @router.get("/{document_id}/translate")

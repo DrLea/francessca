@@ -8,7 +8,7 @@ from app.services.lawyer_service import LawyerService
 def _register(client, email="user@example.com"):
     resp = client.post(
         "/auth/register",
-        json={"email": email, "password": "password123", "full_name": "Test"},
+        json={"email": email, "password": "password123", "full_name": "Test", "data_consent": True},
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["access_token"]

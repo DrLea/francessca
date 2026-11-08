@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_data_consent
 from app.models.user import User
 from app.repositories.conversation_repo import ConversationRepository, MessageRepository
 from app.schemas.chat import (
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 def send_message(
     data: ChatRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
     service = ChatService(db)

@@ -58,6 +58,18 @@ def ensure_active_prompt(db) -> None:
         )
         db.commit()
         log.info("Seeded active system prompt")
+        return
+    # The product was renamed Francessca -> Francesca: update the seeded
+    # prompt in place (admin-written versions are left alone).
+    seeded = db.scalar(
+        select(PromptVersion).where(
+            PromptVersion.is_active.is_(True), PromptVersion.name == "francessca-system"
+        )
+    )
+    if seeded is not None and "Francessca" in seeded.content:
+        seeded.content = seeded.content.replace("Francessca", "Francesca")
+        db.commit()
+        log.info("Renamed Francessca -> Francesca in the seeded system prompt")
 
 
 def ensure_lawyers(db) -> None:

@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import EncryptedJSON
 from app.database import Base
 from app.models.case import JSONType
 
@@ -72,7 +73,7 @@ class Order(Base):
     # even if the client later regenerates or deletes the case.
     case_title: Mapped[str | None] = mapped_column(String(255))
     case_type: Mapped[str | None] = mapped_column(String(64))
-    case_summary: Mapped[dict] = mapped_column(JSONType, default=dict)
+    case_summary: Mapped[dict] = mapped_column(EncryptedJSON, default=dict)
 
     # 0-100, how complete the case was when it was sent. See lead_quality.py.
     quality_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

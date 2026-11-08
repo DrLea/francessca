@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.languages import normalize_language, translation_instruction
 from app.core.logging import get_logger, log_event
+from app.core.crypto import write_encrypted
 from app.core.prompts import FRANCESSCA_SYSTEM_PROMPT, USER_CONTENT_GUARD
 from app.models.document import Document
 from app.models.timeline_event import TimelineSourceType
@@ -165,8 +166,7 @@ class FileService:
         os.makedirs(user_dir, exist_ok=True)
         safe_name = f"{uuid.uuid4().hex}{os.path.splitext(upload.filename or '')[1]}"
         stored_path = os.path.join(user_dir, safe_name)
-        with open(stored_path, "wb") as fh:
-            fh.write(content)
+        write_encrypted(stored_path, content)  # AES-256-GCM at rest
 
         extracted = extract_text(content, mime, upload.filename or safe_name)
 

@@ -41,15 +41,14 @@ class TimelineRepository(BaseRepository[TimelineEvent]):
     def exists_similar(self, user_id: int, event_date: date, description: str) -> bool:
         """Guard against the same appointment being filed twice (mentioned in
         a document and again in chat, or simply repeated by the user)."""
-        return (
-            self.db.scalar(
-                select(func.count())
-                .select_from(TimelineEvent)
-                .where(
+        # Descriptions are encrypted at rest, so compare after decryption.
+        wanted = description.strip().lower()
+        return any(
+            (existing or "").strip().lower() == wanted
+            for existing in self.db.scalars(
+                select(TimelineEvent.description).where(
                     TimelineEvent.user_id == user_id,
                     TimelineEvent.event_date == event_date,
-                    func.lower(TimelineEvent.description) == description.strip().lower(),
                 )
             )
-            or 0
-        ) > 0
+        )

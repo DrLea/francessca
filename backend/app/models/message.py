@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import EncryptedText
 from app.database import Base
 
 
@@ -26,7 +27,7 @@ class Message(Base):
     role: Mapped[MessageRole] = mapped_column(
         Enum(MessageRole, name="message_role"), nullable=False
     )
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(EncryptedText, nullable=False)  # AES-256-GCM at rest
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Structured clarifying questions the assistant attached to this turn,
     # as [{"question": str, "choices": [str, ...]}]. NULL for plain replies

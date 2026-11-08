@@ -14,6 +14,7 @@ from datetime import date, datetime
 from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import EncryptedText
 from app.database import Base
 
 
@@ -40,7 +41,7 @@ class TimelineEvent(Base):
     # used to display/sort events whose exact date is only approximate.
     date_label: Mapped[str] = mapped_column(String(128), default="")
 
-    description: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(EncryptedText, nullable=False)
     is_deadline: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     source_type: Mapped[TimelineSourceType] = mapped_column(

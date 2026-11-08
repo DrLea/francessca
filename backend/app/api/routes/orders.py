@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger, log_event
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_data_consent
 from app.models.document import Document
 from app.models.lawyer import Lawyer
 from app.models.order import CLOSED_STATUSES, LawyerReview, Order, OrderStatus
@@ -35,7 +35,7 @@ def _own_order(db: Session, user: User, order_id: int) -> Order:
 def send_case(
     data: OrderCreate,
     background: BackgroundTasks,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> ClientOrderOut:
     if user.role == UserRole.lawyer:

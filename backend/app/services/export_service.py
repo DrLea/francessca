@@ -5,7 +5,7 @@ import os
 import zipfile
 from io import BytesIO
 
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
@@ -19,6 +19,7 @@ from reportlab.platypus import (
 )
 from sqlalchemy.orm import Session
 
+from app.core.crypto import read_decrypted, write_encrypted
 from app.config import settings
 from app.core.languages import normalize_language
 from app.core.logging import get_logger, log_event
@@ -128,6 +129,22 @@ def _section_label(label: str, lang: str) -> str:
     return _SECTION_LABEL_TRANSLATIONS.get(label, {}).get(lang, label)
 
 
+RTL_LANGUAGES = {"ar"}
+
+
+def _visual_rtl(text: str) -> str:
+    """Arabic for reportlab, which lays text out left to right and does not
+    join letters: reshape to presentation forms, reorder each line with the
+    Unicode bidi algorithm, escape, and keep line breaks as <br/>."""
+    from xml.sax.saxutils import escape
+
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+
+    lines = str(text).replace("<br/>", "\n").split("\n")
+    return "<br/>".join(escape(get_display(arabic_reshaper.reshape(line))) for line in lines)
+
+
 def _disclaimer(lang: str) -> str:
     lang = normalize_language(lang)
     return _DISCLAIMER if lang == "en" else _DISCLAIMER_TRANSLATIONS.get(lang, _DISCLAIMER)
@@ -155,8 +172,7 @@ class ExportService:
 
         filename = f"case_{case.id}_summary.pdf"
         path = os.path.join(self._export_dir, filename)
-        with open(path, "wb") as fh:
-            fh.write(pdf_bytes)
+        write_encrypted(path, pdf_bytes)
 
         export = Export(
             case_id=case.id,
@@ -178,19 +194,18 @@ class ExportService:
 
         buffer = BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(pdf_export.stored_path, arcname="00_case_summary.pdf")
+            zf.writestr("00_case_summary.pdf", read_decrypted(pdf_export.stored_path))
             for i, doc in enumerate(docs, start=1):
                 if os.path.exists(doc.stored_path):
-                    zf.write(
-                        doc.stored_path,
-                        arcname=f"documents/{i:02d}_{doc.filename}",
+                    zf.writestr(
+                        f"documents/{i:02d}_{doc.filename}",
+                        read_decrypted(doc.stored_path),
                     )
 
         filename = f"case_{case.id}_bundle.zip"
         path = os.path.join(self._export_dir, filename)
         data = buffer.getvalue()
-        with open(path, "wb") as fh:
-            fh.write(data)
+        write_encrypted(path, data)
 
         export = Export(
             case_id=case.id,
@@ -214,9 +229,10 @@ class ExportService:
     ) -> bytes:
         """Render the case-summary PDF.
 
-        Uses DejaVu fonts when available for better Unicode support (Cyrillic, Greek, etc).
-        Arabic text is rendered as-is without bidi reshaping (RTL layout not yet implemented).
+        Uses DejaVu fonts when available for Unicode (Cyrillic, Arabic, ...).
+        Arabic is reshaped, reordered right-to-left and right-aligned.
         """
+        rtl = normalize_language(lang) in RTL_LANGUAGES
         buffer = BytesIO()
         doc = SimpleDocTemplate(
             buffer, pagesize=A4,
@@ -236,11 +252,17 @@ class ExportService:
         body = ParagraphStyle("Body", parent=styles["BodyText"], alignment=TA_LEFT, fontName=font_name)
         small = ParagraphStyle("Small", parent=styles["BodyText"], fontSize=8,
                                textColor="#666666", fontName=font_name)
+        if rtl:
+            for style in (h1, h2, body, small):
+                style.alignment = TA_RIGHT
+
+        def para(text: str, style: ParagraphStyle) -> Paragraph:
+            return Paragraph(_visual_rtl(text) if rtl else text, style)
 
         disclaimer = _disclaimer(lang)
 
-        flow: list = [Paragraph(title or "Case Summary", h1), Spacer(1, 6)]
-        flow.append(Paragraph(disclaimer, small))
+        flow: list = [para(title or "Case Summary", h1), Spacer(1, 6)]
+        flow.append(para(disclaimer, small))
         flow.append(Spacer(1, 12))
 
         data = summary.model_dump()
@@ -250,12 +272,17 @@ class ExportService:
             if key == "timeline" and events:
                 # Prefer the structured, auto-extracted timeline (real dates,
                 # deadline flags) over the AI summary's free-form string list.
-                flow.append(Paragraph(translated_label, h2))
+                flow.append(para(translated_label, h2))
                 items = [
                     ListItem(
-                        Paragraph(
-                            f"<b>{e.event_date.isoformat() if e.event_date else e.date_label or '—'}"
-                            f"</b> — {e.description}"
+                        para(
+                            (
+                                f"{e.event_date.isoformat() if e.event_date else e.date_label or '—'}"
+                                f" — {e.description}"
+                                if rtl
+                                else f"<b>{e.event_date.isoformat() if e.event_date else e.date_label or '—'}"
+                                f"</b> — {e.description}"
+                            )
                             + (" [DEADLINE]" if e.is_deadline else ""),
                             body,
                         )
@@ -268,19 +295,19 @@ class ExportService:
             value = data.get(key)
             if not value:
                 continue
-            flow.append(Paragraph(translated_label, h2))
+            flow.append(para(translated_label, h2))
             if isinstance(value, list):
-                items = [ListItem(Paragraph(str(v), body)) for v in value]
+                items = [ListItem(para(str(v), body)) for v in value]
                 flow.append(ListFlowable(items, bulletType="bullet"))
             else:
-                flow.append(Paragraph(str(value), body))
+                flow.append(para(str(value), body))
 
         if summary.narrative:
-            flow.append(Paragraph(_section_label("Summary", lang), h2))
-            flow.append(Paragraph(summary.narrative.replace("\n", "<br/>"), body))
+            flow.append(para(_section_label("Summary", lang), h2))
+            flow.append(para(summary.narrative.replace("\n", "<br/>"), body))
 
         flow.append(Spacer(1, 18))
-        flow.append(Paragraph(disclaimer, small))
+        flow.append(para(disclaimer, small))
 
         doc.build(flow)
         return buffer.getvalue()

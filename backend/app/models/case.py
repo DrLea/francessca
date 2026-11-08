@@ -7,6 +7,7 @@ from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import EncryptedJSON
 from app.database import Base
 
 # Use JSONB on PostgreSQL (production) and fall back to JSON elsewhere (tests).
@@ -27,7 +28,7 @@ class Case(Base):
     case_type: Mapped[str | None] = mapped_column(String(64))
 
     # Structured summary stored as JSON. See schemas.case.CaseSummary.
-    summary: Mapped[dict] = mapped_column(JSONType, default=dict)
+    summary: Mapped[dict] = mapped_column(EncryptedJSON, default=dict)  # AES-256-GCM at rest
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

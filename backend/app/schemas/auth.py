@@ -9,6 +9,9 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
     language: str = Field(default="en", max_length=8)
+    # Consent to keep case data on Francesca's servers in Germany. Can also
+    # be given later (POST /me/consent); nothing is stored before that.
+    data_consent: bool = False
 
 
 class LoginRequest(BaseModel):

@@ -23,3 +23,18 @@ def test_parse_summary_falls_back_to_narrative_on_bad_json():
 def test_parse_summary_ignores_unknown_keys():
     summary = CaseService._parse_summary('{"case_type": "Tax", "bogus": 1}', [])
     assert summary.case_type == "Tax"
+
+
+def test_arabic_pdf_is_shaped_right_to_left(db_session, monkeypatch, tmp_path):
+    from app.config import settings
+    from app.schemas.case import CaseSummary
+
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    from app.services.export_service import ExportService, _visual_rtl
+
+    shaped = _visual_rtl("مرحبا")
+    assert shaped != "مرحبا"  # reshaped presentation forms, reordered
+    pdf = ExportService(db_session)._render_pdf(
+        "قضية", CaseSummary(narrative="سطر أول\nسطر ثان"), "ar", []
+    )
+    assert pdf.startswith(b"%PDF")

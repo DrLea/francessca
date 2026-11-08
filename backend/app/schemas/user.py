@@ -20,6 +20,7 @@ class UserOut(BaseModel):
     tier: UserTier
     token_limit: int | None
     tokens_used: int
+    data_consent_at: datetime | None = None
     created_at: datetime
 
 

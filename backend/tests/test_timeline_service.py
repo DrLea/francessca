@@ -253,3 +253,28 @@ def test_manual_entries_can_be_added_by_hand(db_session):
     assert event.source_type is TimelineSourceType.manual
     assert event.description == "Appointment at the Ausländerbehörde."
     assert [e.id for e in service.list_for_user(user.id)] == [event.id]
+
+
+def test_deadline_reminders_go_out_once(db_session):
+    from datetime import date, timedelta
+
+    from app.models.timeline_event import TimelineEvent, TimelineSourceType
+    from app.models.user import User, UserTier
+    from app.services.reminder_service import send_due_reminders
+
+    user = User(email="rem@example.com", tier=UserTier.free)
+    db_session.add(user)
+    db_session.flush()
+    today = date(2026, 11, 8)
+    for offset in (1, 5, 30):
+        db_session.add(TimelineEvent(
+            user_id=user.id, event_date=today + timedelta(days=offset), date_label="",
+            description=f"Deadline in {offset}", is_deadline=True,
+            source_type=TimelineSourceType.manual,
+        ))
+    db_session.commit()
+    assert send_due_reminders(db_session, today=today) == 2  # 1 and 5 days out
+    assert send_due_reminders(db_session, today=today) == 0  # never twice
+    # Two days later the 5-day entry is 3 days out: still in the 7-day window,
+    # already reminded. The day before it, the 1-day reminder goes out.
+    assert send_due_reminders(db_session, today=today + timedelta(days=4)) == 1

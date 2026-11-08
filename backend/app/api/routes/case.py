@@ -4,11 +4,12 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_data_consent
 from app.models.timeline_event import TimelineSourceType
 from app.models.user import User
 from app.repositories.conversation_repo import ConversationRepository
@@ -20,6 +21,20 @@ from app.services.export_service import ExportService
 from app.services.templates import CATEGORIES, TEMPLATES, translate_template
 from app.services.timeline_service import TimelineService
 
+
+
+def _decrypted_response(path: str, media_type: str, filename: str) -> Response:
+    """Files are encrypted at rest; decrypt in memory for the owner."""
+    from urllib.parse import quote
+
+    from app.core.crypto import read_decrypted
+
+    return Response(
+        content=read_decrypted(path),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
 router = APIRouter(prefix="/case", tags=["case"])
 
 
@@ -29,6 +44,23 @@ def list_templates(lang: str = "en") -> dict:
         "categories": CATEGORIES,
         "templates": [translate_template(t, lang) for t in TEMPLATES.values()],
     }
+
+
+@router.get("/timeline/upcoming", response_model=list[TimelineEventOut])
+def upcoming_timeline(
+    days: int = 14,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[TimelineEventOut]:
+    """In-app reminders: dated entries in the next `days` days."""
+    from datetime import date, timedelta
+
+    today = date.today()
+    horizon = today + timedelta(days=max(1, min(days, 90)))
+    return [
+        e for e in get_timeline(user=user, db=db)
+        if e.event_date is not None and today <= e.event_date <= horizon
+    ]
 
 
 @router.get("/timeline", response_model=list[TimelineEventOut])
@@ -76,7 +108,7 @@ def get_timeline(
 )
 def create_timeline_event(
     data: TimelineEventCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> TimelineEventOut:
     """Add an entry by hand — for anything the extractor missed."""
@@ -105,7 +137,7 @@ def delete_timeline_event(
 def generate_summary(
     conversation_id: int,
     title: str | None = None,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> CaseOut:
     case = CaseService(db).generate_summary(user, conversation_id, title)
@@ -123,7 +155,7 @@ def list_cases(
 @router.post("/export")
 def export_case(
     data: CaseExportRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_data_consent),
     db: Session = Depends(get_db),
 ) -> dict:
     """Generate a fresh case summary then build PDF (+ optional ZIP)."""
@@ -142,7 +174,7 @@ def download_export(
     export_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     from app.models.export import Export
 
     export = db.get(Export, export_id)
@@ -153,4 +185,57 @@ def download_export(
             status_code=status.HTTP_410_GONE, detail="Export file no longer available"
         )
     media = "application/pdf" if export.kind.value == "pdf" else "application/zip"
-    return FileResponse(export.stored_path, media_type=media, filename=export.filename)
+    return _decrypted_response(export.stored_path, media, export.filename)
+
+
+# --- Reply letters in German, with evidence ----------------------------------
+class ReplyDraftRequest(BaseModel):
+    situation: str = Field(min_length=10, max_length=6_000)
+    recipient: str | None = Field(default=None, max_length=255)
+    # The German letter being answered, if any (an uploaded document).
+    reply_to_document_id: int | None = None
+    # Photos / documents attached as "Anlagen".
+    evidence_document_ids: list[int] = Field(default_factory=list, max_length=10)
+
+
+class ReplyPdfRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=255)
+    german: str = Field(min_length=1, max_length=20_000)
+    evidence_document_ids: list[int] = Field(default_factory=list, max_length=10)
+
+
+@router.post("/reply-draft")
+def draft_reply(
+    data: ReplyDraftRequest,
+    user: User = Depends(require_data_consent),
+    db: Session = Depends(get_db),
+) -> dict:
+    """A polite, firm German letter plus a translation into the user's
+    language. One model call. The user reviews and edits it before use."""
+    from app.services.reply_service import ReplyService
+
+    return ReplyService(db).draft(
+        user,
+        situation=data.situation,
+        recipient=data.recipient,
+        reply_to_document_id=data.reply_to_document_id,
+        evidence_document_ids=data.evidence_document_ids,
+    )
+
+
+@router.post("/reply-draft/pdf")
+def reply_pdf(
+    data: ReplyPdfRequest,
+    user: User = Depends(require_data_consent),
+    db: Session = Depends(get_db),
+) -> Response:
+    """The (possibly edited) German letter as a PDF, photos attached as
+    Anlagen. Rendered on the fly and never stored."""
+    from app.services.reply_service import ReplyService
+
+    pdf = ReplyService(db).render_pdf(user, data.subject, data.german, data.evidence_document_ids)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="Brief.pdf"'},
+    )
