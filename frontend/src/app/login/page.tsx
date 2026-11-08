@@ -9,6 +9,10 @@ import { useT } from "@/lib/i18n";
 import { GoogleButton } from "@/components/GoogleButton";
 import { Button, Card, Disclaimer, Input } from "@/components/ui";
 
+// The offline desktop build keeps everything on the device, so there is no
+// server storage to consent to.
+const ON_DEVICE = process.env.NEXT_PUBLIC_SAME_ORIGIN_API === "1";
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, signIn } = useAuth();
@@ -17,6 +21,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +38,12 @@ export default function LoginPage() {
       const { access_token } =
         mode === "login"
           ? await api.login({ email, password })
-          : await api.register({ email, password, full_name: fullName || undefined });
+          : await api.register({
+              email,
+              password,
+              full_name: fullName || undefined,
+              data_consent: consent || ON_DEVICE,
+            });
       await signIn(access_token);
     } catch (err) {
       setError((err as Error).message);
@@ -84,6 +94,18 @@ export default function LoginPage() {
             required
             minLength={8}
           />
+          {mode === "register" && !ON_DEVICE && (
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                required
+              />
+              {t("consent.checkbox")}
+            </label>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button type="submit" disabled={loading}>
             {loading ? t("login.pleaseWait") : mode === "login" ? t("login.titleLogin") : t("login.signUp")}

@@ -245,6 +245,8 @@ def configure_environment(home: Path, base_url: str, model_name: str) -> None:
         "FRONTEND_URL": f"http://{API_HOST}:{API_PORT}",
         "BACKEND_URL": f"http://{API_HOST}:{API_PORT}",
         "CORS_ORIGINS": f"http://{API_HOST}:{API_PORT}",
+        # Everything stays on this device: no server-storage consent needed.
+        "DATA_ON_DEVICE": "true",
         # Offline: no bar-directory scrape, so ship the sample directory.
         "USE_FAKE_LAWYERS_DB": "true",
     }

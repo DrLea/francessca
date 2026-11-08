@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # 32 random bytes, base64. Generate: python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"
     # If empty, a key is derived from JWT_SECRET (fine for development only).
     data_encryption_key: str = Field("", alias="DATA_ENCRYPTION_KEY")
+    # The offline desktop build: data never leaves the device, so the
+    # consent to store it on our servers does not apply.
+    data_on_device: bool = Field(False, alias="DATA_ON_DEVICE")
     # Deadline reminders (7 days and 1 day before, email + in-app): the
     # hourly background check. Off in tests.
     reminders_enabled: bool = Field(True, alias="REMINDERS_ENABLED")

@@ -15,6 +15,7 @@ export function SendCaseDialog({ lawyer, onClose }: { lawyer: Lawyer; onClose: (
   // "case:<id>", "conv:<id>" or "" (message only).
   const [source, setSource] = useState("");
   const [message, setMessage] = useState("");
+  const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export function SendCaseDialog({ lawyer, onClose }: { lawyer: Lawyer; onClose: (
         case_id: kind === "case" ? Number(id) : undefined,
         conversation_id: kind === "conv" ? Number(id) : undefined,
         message: message.trim() || undefined,
+        consent,
       });
       setSent(true);
     } catch (err) {
@@ -117,9 +119,20 @@ export function SendCaseDialog({ lawyer, onClose }: { lawyer: Lawyer; onClose: (
             />
           </Field>
           <p className="text-xs text-slate-400">{t("req.privacyNote")}</p>
+          {/* Per-case consent: nothing reaches this lawyer without it. */}
+          <label className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              required
+            />
+            {t("req.consent", { name: lawyer.name })}
+          </label>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
-            <Button type="submit" disabled={sending}>
+            <Button type="submit" disabled={sending || !consent}>
               {sending ? t("lp.sending") : t("req.send")}
             </Button>
             <Button type="button" variant="ghost" onClick={onClose}>

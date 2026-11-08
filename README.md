@@ -8,7 +8,8 @@ Every AI request is prepended with a mandatory system prompt that forbids legal 
 
 ```
 backend/    FastAPI + SQLAlchemy + Alembic + PostgreSQL + Redis
-            JWT + Google OAuth, Anthropic Claude Haiku, repository/service pattern
+            JWT + Google OAuth, self-hosted LLM (OpenAI-compatible; Claude optional),
+            AES-256-GCM at rest, repository/service pattern
 frontend/   Next.js + React + TypeScript + TailwindCSS (minimal scaffold)
 docker-compose.yml   db + redis + backend + frontend
 ```
@@ -41,7 +42,7 @@ cp .env.template .env
 # then edit .env
 ```
 
-Key variables: `DATABASE_URL`, `JWT_SECRET`, `REDIS_URL`, `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, SMTP settings, `FRONTEND_URL`, `BACKEND_URL`, `FREE_TIER_TOKEN_LIMIT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
+Key variables: `DATABASE_URL`, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`, `REDIS_URL`, `AI_PROVIDER` + `LOCAL_AI_BASE_URL`/`LOCAL_AI_MODEL` (self-hosted model; `ANTHROPIC_API_KEY` only if you opt in), `GOOGLE_CLIENT_ID/SECRET`, SMTP settings, `FRONTEND_URL`, `BACKEND_URL`, `FAIR_USE_DAILY_TOKENS`, `LAWYER_TRIAL_MONTHS`, `LAWYER_MONTHLY_FEE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
 
 Generate a strong JWT secret:
 
@@ -105,7 +106,15 @@ Interactive OpenAPI docs are served at `/docs` and the raw schema at `/openapi.j
 | POST | `/auth/login` | Log in |
 | POST | `/auth/google` | Log in / sign up with a Google ID token |
 | GET | `/me` | Current user profile |
-| POST | `/me/plan` | Switch plan (free while in beta — no payment step) |
+| POST | `/me/consent` | Consent to storing case data on our servers in Germany |
+| GET | `/me/export` | **All** of the account's data as a ZIP (GDPR Art. 15/20) |
+| DELETE | `/me` | Delete the account and every file on disk |
+| GET | `/case/timeline/upcoming` | In-app reminders: dated entries in the next N days |
+| POST | `/case/reply-draft` | Polite, firm German letter + translation, photos as evidence |
+| POST | `/case/reply-draft/pdf` | That letter as a PDF, photos attached as *Anlagen* |
+| POST | `/orders/{id}/withdraw` | Take back consent for a case already shared |
+| POST | `/reports` | Report a lawyer (auto-suspends at `REPORT_SUSPEND_THRESHOLD`) |
+| POST | `/lawyer/verification/bea` | Lawyer types back the code sent to their beA mailbox |
 | GET | `/public/lawyers` | **No auth.** Contact-free directory preview for the landing page |
 | GET | `/public/downloads` | **No auth.** Desktop builds on offer, from `DOWNLOAD_*` env |
 | POST | `/public/lawyer-applications` | **No auth.** A lawyer applies to be listed |
@@ -175,7 +184,8 @@ publish the result through the landing page's `DOWNLOAD_*` variables.
 
 - **Directory preview** comes from `GET /public/lawyers`, which returns name, firm, city, specializations and languages only — email, phone and address stay behind the login on `/lawyers`.
 - **Desktop downloads** come from `GET /public/downloads`, which reads the `DOWNLOAD_*` variables at request time — publishing a release is an `.env` change plus a backend restart, with no frontend rebuild. Checksums are shown under the buttons when set, since the executables are unsigned. While the variables are empty the whole section is hidden rather than showing dead links.
-- **Plans** are Free and Premium. `POST /me/plan` moves a user between them with no payment step — Francesca is in beta, so Premium simply lifts the monthly token limit. **Put a payment provider in front of that endpoint before charging anyone.**
+- **Pricing** follows the pitch deck: free for people (forever, no plans), law firms €99/month flat after 3 free months, universities and Law Clinics €500/month partner licence, white label later. Flat fees only, never per client (§49b Abs. 3 BRAO).
+- **Trust** section: verified lawyers, data that stays in Germany, on-device mode.
 - **Lawyer sign-up** posts to `POST /public/lawyer-applications` and is stored as `pending` in `lawyer_applications` (migration `0004`). Nothing submitted there is visible anywhere until an admin calls `/admin/lawyer-applications/{id}/approve`, which creates the directory entry with a `source_key` of `application:<id>` so a later scraper sync can never overwrite or delete it. Rejected applications are kept for the record and never published.
 
 ## Case timeline
@@ -202,9 +212,9 @@ Users have a `language` preference (`GET/PATCH /me`, `GET /meta/languages` for t
 
 These are first-pass translations aimed at making the product usable immediately in each language — they have **not** been reviewed by a native legal-domain speaker and should get that review before being relied on in production, especially the AR/UK/RU/PL/RO form and export text. Also note: the PDF export does not yet do Arabic bidi/reshaping, so Arabic text in the PDF will not render right-to-left correctly without adding an Arabic-aware font and `python-bidi`/`arabic-reshaper`.
 
-## Token limits
+## Fair use (no plans)
 
-Every user has a monthly token allowance (`token_limit`; free tier defaults to `FREE_TIER_TOKEN_LIMIT`, premium is unlimited). Each AI request estimates tokens up-front and is **rejected with HTTP 402** if it would exceed the remaining allowance; actual usage is reconciled from the model response and recorded in the `token_usage` ledger. Admins can change any user's tier and limit.
+Francesca is free for people, so there is nothing to buy. The only limit is a hidden anti-abuse cap: a rolling 24-hour token budget per user (`FAIR_USE_DAILY_TOKENS`, default 200k), computed from the `token_usage` ledger. A request that would exceed it gets **HTTP 429** ("continue in a few hours"). Admins can override the cap per user (`token_limit`) or lift it (`tier = premium`, kept for staff and pilots, never sold). The UI shows no allowance.
 
 ## Lawyer directory & scraper
 
@@ -216,11 +226,28 @@ Lawyers and clients sign in through separate doors and get separate sides of the
 
 - **Lawyers** register at `/lawyer/register` (name, email, password, city) and can sign in at once (`/lawyer/login`). The profile stays out of the directory until an admin approves it. The portal at `/lawyer` has orders, closed deals, statistics, finance, a detailed profile editor and a feedback button.
 - **Orders**: a client opens `/lawyers`, picks a lawyer who has an account and sends a prepared case (`POST /orders`). The lawyer sees the summary and a lead quality score (0-100, a heuristic in `services/lead_quality.py`, no model call); the client's name and email are revealed only on accept. Clients follow their requests at `/requests` and can rate the lawyer once the order is closed.
-- **Free allowance**: accepting uses one order. The first `LAWYER_FREE_ORDERS` (default 3) are free; after that the lawyer sees a "contact us" screen (`SUPPORT_EMAIL`) and an admin unlocks more under `/admin/lawyers`. No payment provider is wired in.
-- **Admin** (`/admin`, admin accounts only): overview of everything, lawyer approvals plus order allowances (`/admin/lawyers`), and lawyer feedback with internal notes (`/admin/feedback`).
+- **Subscription, never per client**: approval starts a free trial (`LAWYER_TRIAL_MONTHS`, default 3). After it a firm needs an active subscription (`LAWYER_MONTHLY_FEE`, default €99) to accept cases; leads themselves cost nothing. No payment provider is wired in: an admin records payment under `/admin/lawyers` ("+1 month"), which moves `paid_until` forward. Firms approved before migration `0006` got a fresh 3-month trial.
+- **Per-case consent**: a case reaches a lawyer only after the client ticks consent for exactly that lawyer (`consent_at`). The client can take it back any time (`POST /orders/{id}/withdraw`); the lawyer then keeps the record but loses the case file and the client's contact.
+- **Verification** (`services/verification_service.py`): (1) the lawyer enters their register entry, chamber and admission date, an admin checks them in the official BRAK register; (2) the admin issues a one-time code (only its hash is stored) and sends it to the lawyer's **beA** mailbox, the lawyer types it back; (3) ID check by video ident — no provider integrated yet, the admin records the result; (4) when all pass, the profile is verified for a year (`verified_until`), shown as a "Verified" badge; `/admin/rechecks-due` lists the ones expiring.
+- **Reports & suspension**: clients can report a lawyer from `/requests`. `REPORT_SUSPEND_THRESHOLD` (default 3) open reports from different people suspend the lawyer at once; admins can suspend or lift instantly. A suspended lawyer is hidden from the directory and cannot receive cases.
+- **Partners**: universities, Law Clinics and international offices hold a partner licence (`PARTNER_MONTHLY_FEE`, default €500), managed at `/admin/partners`; lawyer-portal accounts (e.g. supervised Law Clinic members) can be linked to a partner.
+- **Admin** (`/admin`, admin accounts only): overview, lawyer approvals, subscriptions and verification (`/admin/lawyers`), reports (`/admin/reports`), partners (`/admin/partners`), and lawyer feedback (`/admin/feedback`).
 - **Email**: sign-ups, approvals, new orders, responses and feedback are mailed when `SMTP_HOST` is set; otherwise they are only logged.
 
-Migration `0005_lawyer_portal` adds all of this: run `alembic upgrade head`.
+Migrations `0005_lawyer_portal` and `0006_deck_alignment` add all of this: run `alembic upgrade head`.
+
+## Privacy: consent, encryption, export, delete
+
+- **Consent before storing**: chat, uploads, case exports, reply letters and sending a case all require the user's consent to keep case data on our servers in Germany (`users.data_consent_at`, asked at sign-up or in a dialog — the API answers `428 consent_required`). Without it the offline app is the way to use Francesca. The desktop build sets `DATA_ON_DEVICE=true`, where none of this applies.
+- **Encrypted at rest** (`app/core/crypto.py`): AES-256-GCM for uploaded files, exports, chat messages, extracted document text, timeline entries and case summaries. Set `DATA_ENCRYPTION_KEY` and **back it up**. Data written before this change stays readable and is encrypted when next written.
+- **One tap**: `GET /me/export` returns everything as a ZIP; `DELETE /me` removes the account, cascades every row and deletes the files on disk. Both are on the dashboard.
+- **Never used for training**, and with the default `AI_PROVIDER=local` no case data goes to a third-party AI service.
+
+## Deadline reminders & German reply letters
+
+- Every dated timeline entry is reminded **7 days and 1 day before**: by email (when `SMTP_HOST` is set) and in the app (dashboard "Coming up"). An hourly loop in the API process sends them; each goes once (`reminded_7d_at`, `reminded_1d_at`). `POST /admin/reminders/run` triggers it by hand.
+- `/letters`: the user describes the problem in their language; Francesca writes a polite, firm German letter (facts and requests only, placeholders instead of invented details) plus a translation, in **one** model call. The user edits it and downloads a PDF with their photos attached as *Anlagen*.
+- Arabic case-summary PDFs are reshaped and laid out right to left (`arabic-reshaper`, `python-bidi`).
 
 ## Installable app & offline assistant
 
@@ -228,7 +255,8 @@ The frontend is a PWA (`public/manifest.webmanifest`, `public/sw.js`, production
 
 ## Security
 
-- Anthropic API key is server-side only and never exposed to the frontend; all AI calls go through the backend.
+- Self-hosted models by default (`AI_PROVIDER=local`); the Anthropic key, if you opt in, is server-side only. All AI calls go through the backend.
+- Case data encrypted at rest with AES-256-GCM; stored only with consent; per-case consent before a lawyer sees anything.
 - JWT auth on every protected route; bcrypt password hashing.
 - Upload validation (type + size), random stored filenames (no path traversal), per-user directories.
 - Rate limiting (slowapi) and CORS restricted to configured origins.
@@ -255,7 +283,7 @@ Covers security/JWT, token limits, scraper parsing, case-summary parsing, and an
 
 ## Extending later
 
-The architecture is intentionally modular so you can add lawyer accounts, paid subscriptions, multilingual prompts (PromptVersion already supports versions), more form templates (`app/services/templates.py` is data-driven), and additional bar-association directories (add a sibling scraper and reuse `LawyerService`).
+Still to wire in for production: a payment provider for law-firm subscriptions and partner licences (today an admin records payments), a video-ident provider for the ID check, and white label (year 2 in the deck). The architecture is intentionally modular so you can add multilingual prompts (PromptVersion already supports versions), more form templates (`app/services/templates.py` is data-driven), and additional bar-association directories (add a sibling scraper and reuse `LawyerService`).
 
 ## Disclaimer
 

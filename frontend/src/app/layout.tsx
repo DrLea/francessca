@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth";
 import { I18nProvider } from "@/lib/i18n";
 import { PwaProvider } from "@/lib/pwa";
 import { NavBar } from "@/components/NavBar";
+import { ConsentDialog } from "@/components/ConsentDialog";
 
 export const metadata: Metadata = {
   title: "Francesca",
@@ -30,6 +31,7 @@ export default function RootLayout({
           <I18nProvider>
             <PwaProvider>
               <NavBar />
+              <ConsentDialog />
               {children}
             </PwaProvider>
           </I18nProvider>

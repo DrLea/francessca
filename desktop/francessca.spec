@@ -34,7 +34,18 @@ hiddenimports = [
     "docx",
     "PIL.Image",
     "reportlab.pdfbase._fontdata",
+    # Arabic PDF export and the routes that import their services lazily.
+    "arabic_reshaper",
+    "bidi.algorithm",
+    "app.services.reply_service",
+    "app.services.reminder_service",
 ]
+try:  # arabic_reshaper ships its letter tables / config as data files
+    from PyInstaller.utils.hooks import collect_data_files
+
+    datas += collect_data_files("arabic_reshaper")
+except Exception:  # noqa: BLE001
+    pass
 
 a = Analysis(
     ["main.py"],

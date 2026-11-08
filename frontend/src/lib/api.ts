@@ -48,9 +48,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const detail = await res
       .json()
       .catch(() => ({ detail: res.statusText }));
+    // Case data needs the user's consent first; any page can react to it.
+    if (res.status === 428 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("francesca:consent-required"));
+    }
     throw new ApiError(detail.detail ?? `Request failed: ${res.status}`, res.status);
   }
   return res.json() as Promise<T>;
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.URL.revokeObjectURL(url);
 }
 
 // ---- Types ----------------------------------------------------------------
@@ -63,6 +76,8 @@ export interface User {
   tier: "free" | "premium";
   token_limit: number | null;
   tokens_used: number;
+  /** When the user agreed to keep case data on our servers in Germany. */
+  data_consent_at?: string | null;
 }
 
 export interface Conversation {
@@ -136,6 +151,8 @@ export interface Lawyer {
   rating_count?: number;
   /** The lawyer has an account, so a case can be sent to them in-app. */
   accepts_requests?: boolean;
+  /** Register, beA code and ID checked within the last year. */
+  is_verified?: boolean;
 }
 
 export interface DashboardData {
@@ -192,6 +209,7 @@ export interface LawyerPreview {
   city: string | null;
   specializations: string[];
   languages: string[];
+  is_verified?: boolean;
 }
 
 export interface DesktopDownload {
@@ -219,6 +237,7 @@ export type OrderStatus =
   | "accepted"
   | "declined"
   | "cancelled"
+  | "withdrawn"
   | "closed_won"
   | "closed_lost";
 
@@ -292,31 +311,90 @@ export interface LawyerProfile {
   consultation_fee: string | null;
   office_hours: string | null;
   is_published: boolean;
+  is_verified: boolean;
+  brak_register_id: string | null;
+  chamber: string | null;
+  admission_date: string | null;
   rating_avg: number | null;
   rating_count: number;
   languages: string[];
   specializations: string[];
 }
 
-export interface LawyerQuota {
-  free_total: number;
-  extra: number;
-  used: number;
-  remaining: number;
-  free_remaining: number;
+/** Flat monthly fee after a free trial -- never per client. */
+export interface LawyerSubscription {
+  state: "not_started" | "trial" | "active" | "expired";
+  can_accept: boolean;
+  trial_ends_at: string | null;
+  paid_until: string | null;
+  monthly_fee: number;
+  trial_months: number;
   contact_email: string | null;
+}
+
+export interface LawyerVerification {
+  register_checked: boolean;
+  bea_verified: boolean;
+  bea_code_sent: boolean;
+  id_check_status: "not_started" | "pending" | "passed" | "failed";
+  verified_until: string | null;
+  is_verified: boolean;
+  is_suspended: boolean;
 }
 
 export interface LawyerMe {
   approval: "pending" | "approved" | "rejected";
   profile: LawyerProfile;
-  quota: LawyerQuota;
+  subscription: LawyerSubscription;
+  verification: LawyerVerification;
   profile_completeness: number;
 }
 
 export type LawyerProfileInput = Partial<
-  Omit<LawyerProfile, "id" | "is_published" | "rating_avg" | "rating_count">
+  Omit<LawyerProfile, "id" | "is_published" | "is_verified" | "rating_avg" | "rating_count">
 >;
+
+export type ReportReason = "not_a_lawyer" | "misconduct" | "no_response" | "privacy" | "other";
+
+export interface LawyerReport {
+  id: number;
+  lawyer_id: number;
+  order_id: number | null;
+  reason: ReportReason;
+  details: string | null;
+  status: "open" | "resolved" | "dismissed";
+  admin_note: string | null;
+  created_at: string;
+}
+
+export type PartnerKind =
+  | "university"
+  | "law_clinic"
+  | "international_office"
+  | "ngo"
+  | "integration_office";
+
+export interface Partner {
+  id: number;
+  name: string;
+  kind: PartnerKind;
+  city: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  monthly_fee: number;
+  status: "trial" | "active" | "inactive";
+  paid_until: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ReplyDraft {
+  subject: string;
+  german: string;
+  translation: string;
+  language: string;
+  evidence: { id: number; filename: string; mime: string }[];
+}
 
 export interface LawyerStats {
   orders: {
@@ -339,9 +417,7 @@ export interface LawyerStats {
     revenue: number;
     deals: number;
     avg_deal: number | null;
-    free_orders_used: number;
-    paid_orders_used: number;
-    platform_fees: number;
+    subscription: LawyerSubscription;
   };
   monthly: {
     month: string;
@@ -400,11 +476,31 @@ export interface LawyerAccount {
   is_published: boolean;
   rating_avg: number | null;
   rating_count: number;
-  orders_used: number;
-  free_total: number;
-  extra_orders: number;
-  orders_remaining: number;
+  orders_accepted: number;
+  subscription: LawyerSubscription;
+  verification: LawyerVerification;
+  brak_register_id: string | null;
+  chamber: string | null;
+  admission_date: string | null;
+  suspension_reason: string | null;
+  open_reports: number;
+  partner_id: number | null;
   created_at: string;
+}
+
+export interface AdminLawyerUpdate {
+  is_published?: boolean;
+  extend_paid_months?: number;
+  paid_until?: string | null;
+  trial_ends_at?: string | null;
+  brak_register_id?: string;
+  chamber?: string;
+  admission_date?: string | null;
+  register_checked?: boolean;
+  id_check_status?: LawyerVerification["id_check_status"];
+  suspended?: boolean;
+  suspension_reason?: string;
+  partner_id?: number | null;
 }
 
 export interface AdminOverview {
@@ -442,7 +538,13 @@ export interface AdminOverview {
 export const api = {
   apiUrl: API_URL,
 
-  register: (body: { email: string; password: string; full_name?: string }) =>
+  register: (body: {
+    email: string;
+    password: string;
+    full_name?: string;
+    language?: string;
+    data_consent?: boolean;
+  }) =>
     request<{ access_token: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),
@@ -484,9 +586,50 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // Free while in beta: no payment step, this just moves the tier.
-  changePlan: (tier: "free" | "premium") =>
-    request<User>("/me/plan", { method: "POST", body: JSON.stringify({ tier }) }),
+  // --- Privacy: consent, export everything, delete everything -------------
+  giveConsent: () => request<User>("/me/consent", { method: "POST" }),
+
+  deleteAccount: () => request<{ detail: string }>("/me", { method: "DELETE" }),
+
+  exportMyData: async () => {
+    const res = await fetch(`${API_URL}/me/export`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new ApiError("Export failed", res.status);
+    saveBlob(await res.blob(), "francesca-my-data.zip");
+  },
+
+  upcoming: (days = 14) => request<TimelineEvent[]>(`/case/timeline/upcoming?days=${days}`),
+
+  // --- Reply letters in German ----------------------------------------------
+  draftReply: (body: {
+    situation: string;
+    recipient?: string;
+    reply_to_document_id?: number;
+    evidence_document_ids?: number[];
+  }) => request<ReplyDraft>("/case/reply-draft", { method: "POST", body: JSON.stringify(body) }),
+
+  downloadReplyPdf: async (body: {
+    subject: string;
+    german: string;
+    evidence_document_ids: number[];
+  }) => {
+    const res = await fetch(`${API_URL}/case/reply-draft/pdf`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new ApiError("Download failed", res.status);
+    saveBlob(await res.blob(), "Brief.pdf");
+  },
+
+  // --- Reports about lawyers -------------------------------------------------
+  reportLawyer: (body: {
+    lawyer_id: number;
+    order_id?: number;
+    reason: ReportReason;
+    details?: string;
+  }) => request<LawyerReport>("/reports", { method: "POST", body: JSON.stringify(body) }),
 
   timeline: () => request<TimelineEvent[]>("/case/timeline"),
 
@@ -609,12 +752,18 @@ export const api = {
     case_id?: number;
     conversation_id?: number;
     message?: string;
+    /** Per-case consent to share exactly this case with exactly this lawyer. */
+    consent: boolean;
   }) => request<ClientOrder>("/orders", { method: "POST", body: JSON.stringify(body) }),
 
   myOrders: () => request<ClientOrder[]>("/orders"),
 
   cancelOrder: (id: number) =>
     request<ClientOrder>(`/orders/${id}/cancel`, { method: "POST" }),
+
+  /** Take back consent: the lawyer loses the case file and contact. */
+  withdrawOrder: (id: number) =>
+    request<ClientOrder>(`/orders/${id}/withdraw`, { method: "POST" }),
 
   reviewOrder: (id: number, body: { rating: number; comment?: string }) =>
     request<ClientOrder>(`/orders/${id}/review`, {
@@ -657,6 +806,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  confirmBeaCode: (code: string) =>
+    request<LawyerMe>("/lawyer/verification/bea", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
   lawyerStats: () => request<LawyerStats>("/lawyer/stats"),
 
   lawyerFeedback: () => request<Feedback[]>("/lawyer/feedback"),
@@ -683,14 +838,55 @@ export const api = {
 
   adminLawyerAccounts: () => request<LawyerAccount[]>("/admin/lawyer-accounts"),
 
-  adminUpdateLawyerAccount: (
-    id: number,
-    body: { extra_orders?: number; is_published?: boolean },
-  ) =>
+  adminUpdateLawyerAccount: (id: number, body: AdminLawyerUpdate) =>
     request<LawyerAccount>(`/admin/lawyer-accounts/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  /** One-time code to send to the lawyer's beA mailbox; shown only once. */
+  adminIssueBeaCode: (id: number) =>
+    request<{ code: string; lawyer: LawyerAccount }>(
+      `/admin/lawyer-accounts/${id}/bea-code`,
+      { method: "POST" },
+    ),
+
+  adminStartRecheck: (id: number) =>
+    request<LawyerAccount>(`/admin/lawyer-accounts/${id}/recheck`, { method: "POST" }),
+
+  adminReports: (status?: LawyerReport["status"]) =>
+    request<LawyerReport[]>(`/admin/reports${status ? `?status_filter=${status}` : ""}`),
+
+  adminUpdateReport: (
+    id: number,
+    body: { status?: LawyerReport["status"]; admin_note?: string },
+  ) =>
+    request<LawyerReport>(`/admin/reports/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  adminPartners: () => request<Partner[]>("/admin/partners"),
+
+  adminCreatePartner: (body: {
+    name: string;
+    kind: PartnerKind;
+    city?: string;
+    contact_name?: string;
+    contact_email?: string;
+    notes?: string;
+  }) => request<Partner>("/admin/partners", { method: "POST", body: JSON.stringify(body) }),
+
+  adminUpdatePartner: (
+    id: number,
+    body: Partial<Omit<Partner, "id" | "created_at" | "monthly_fee">> & {
+      extend_paid_months?: number;
+    },
+  ) =>
+    request<Partner>(`/admin/partners/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  adminRunReminders: () =>
+    request<{ sent: number }>("/admin/reminders/run", { method: "POST" }),
 
   adminFeedback: (params: { status?: "new" | "reviewed"; category?: string } = {}) => {
     const qs = new URLSearchParams();

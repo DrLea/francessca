@@ -68,6 +68,7 @@ export function NavBar() {
         { href: "/chat", label: t("nav.chat") },
         { href: "/timeline", label: t("nav.timeline") },
         { href: "/files", label: t("nav.files") },
+        { href: "/letters", label: t("nav.letters") },
         { href: "/lawyers", label: t("nav.lawyers") },
         { href: "/requests", label: t("nav.requests") },
         ...(user?.role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),

@@ -75,7 +75,9 @@ def lawyer_decision(email: str, name: str, approved: bool) -> None:
             email,
             "Your Francesca profile is live",
             f"Hello {name},\n\nyour profile has been approved and now appears in the "
-            f"directory. Your first {settings.lawyer_free_orders} orders are free.\n\n"
+            f"directory. Your free trial of {settings.lawyer_trial_months} months starts "
+            f"today; after it, Francesca is a flat EUR {settings.lawyer_monthly_fee:.0f} "
+            "per month - never per client.\n\n"
             f"Open your portal: {_url('/lawyer')}",
         )
     else:

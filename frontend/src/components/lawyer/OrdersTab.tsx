@@ -19,6 +19,7 @@ export const STATUS_KEY: Record<LawyerOrder["status"], TranslationKey> = {
   accepted: "lp.status.accepted",
   declined: "lp.status.declined",
   cancelled: "lp.status.cancelled",
+  withdrawn: "lp.status.withdrawn",
   closed_won: "lp.status.closedWon",
   closed_lost: "lp.status.closedLost",
 };
@@ -59,17 +60,17 @@ function strings(value: unknown): string[] {
 
 function Paywall({ me, onClose }: { me: LawyerMe; onClose: () => void }) {
   const { t } = useI18n();
-  const email = me.quota.contact_email;
+  const email = me.subscription.contact_email;
   return (
-    <Modal title={t("lp.paywall.title")} onClose={onClose}>
+    <Modal title={t("lp.paywall.expiredTitle")} onClose={onClose}>
       <p className="text-sm leading-relaxed text-slate-600">
-        {t("lp.paywall.body", { count: me.quota.free_total })}
+        {t("lp.paywall.expiredBody", { fee: me.subscription.monthly_fee })}
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
         {email && (
           <a
             href={`mailto:${email}?subject=${encodeURIComponent(
-              `Francesca: more orders for ${me.profile.name}`,
+              `Francesca subscription: ${me.profile.name}`,
             )}`}
           >
             <Button>{t("lp.paywall.cta")}</Button>
@@ -190,7 +191,7 @@ function OrderCard({
   const closed = order.status === "closed_won" || order.status === "closed_lost";
 
   async function respond(action: "accept" | "decline") {
-    if (action === "accept" && me.quota.remaining <= 0) return onPaywall();
+    if (action === "accept" && !me.subscription.can_accept) return onPaywall();
     setBusy(action);
     setError(null);
     try {
@@ -323,11 +324,7 @@ function OrderCard({
                 >
                   {t("lp.orders.decline")}
                 </Button>
-                <span className="text-xs text-slate-400">
-                  {me.quota.free_remaining > 0
-                    ? t("lp.orders.freeNote", { count: me.quota.free_remaining })
-                    : t("lp.orders.usesOne")}
-                </span>
+                <span className="text-xs text-slate-400">{t("lp.fin.flat")}</span>
               </>
             )}
             {(order.status === "accepted" || closed) && (

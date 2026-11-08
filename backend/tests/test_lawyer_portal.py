@@ -450,3 +450,15 @@ def test_lead_quality_score():
     assert 0 < partial < 20
     # Uploaded documents count even if the summary does not list them.
     assert score_lead({}, document_count=3)[1]["documents"] == 20
+
+
+def test_approval_email_renders(monkeypatch):
+    """Background email bodies are built at send time; make sure they render."""
+    from app.services import email_service
+
+    sent = {}
+    monkeypatch.setattr(email_service, "send_email", lambda to, subject, body: sent.update(body=body))
+    email_service.lawyer_decision("a@example.com", "Dr. A", True)
+    assert "99" in sent["body"] and "never per client" in sent["body"]
+    email_service.deadline_reminder("a@example.com", "Ausländerbehörde", "12.11.2026", 1)
+    assert "tomorrow" in sent["body"]

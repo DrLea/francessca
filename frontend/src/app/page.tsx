@@ -6,7 +6,7 @@ import { api, type DesktopDownload, type LawyerPreview } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { InstallApp } from "@/components/InstallApp";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, VerifiedBadge } from "@/components/ui";
 
 const PLATFORM_LABEL: Record<DesktopDownload["platform"], string> = {
   windows: "Windows",
@@ -212,7 +212,12 @@ function Lawyers({
               key={l.id}
               className="py-4 transition-shadow duration-150 hover:shadow-lg"
             >
-              <p className="font-medium text-slate-800">{l.name}</p>
+              <p className="flex flex-wrap items-center gap-2 font-medium text-slate-800">
+                {l.name}
+                {l.is_verified && (
+                  <VerifiedBadge label={t("lawyers.verified")} hint={t("lawyers.verifiedHint")} />
+                )}
+              </p>
               {(l.law_firm || l.city) && (
                 <p className="text-xs text-slate-500">
                   {[l.law_firm, l.city].filter(Boolean).join(" · ")}
@@ -297,94 +302,97 @@ function Offline() {
   );
 }
 
+/** Slide 8: free for people, flat fees for professionals, never per client. */
 function Pricing() {
   const { t } = useI18n();
-  const { user, refresh } = useAuth();
-  const [saving, setSaving] = useState<"free" | "premium" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function choose(tier: "free" | "premium") {
-    setSaving(tier);
-    setError(null);
-    try {
-      await api.changePlan(tier);
-      await refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  const plans = [
+  const contact = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+  const contactHref = contact ? `mailto:${contact}` : "#for-lawyers";
+  const plans: {
+    key: string;
+    name: string;
+    price: string;
+    body: string;
+    cta: { label: string; href: string };
+    highlight?: boolean;
+  }[] = [
     {
-      tier: "free" as const,
-      name: t("home.planFree"),
-      price: t("home.planFreePrice"),
-      features: [t("home.planFreeF1"), t("home.planFreeF2"), t("home.planFreeF3")],
+      key: "people",
+      name: t("price.people"),
+      price: t("price.peoplePrice"),
+      body: t("price.peopleBody"),
+      cta: { label: t("price.peopleCta"), href: "/login" },
+      highlight: true,
     },
     {
-      tier: "premium" as const,
-      name: t("home.planPremium"),
-      price: t("home.planPremiumPrice"),
-      features: [
-        t("home.planPremiumF1"),
-        t("home.planPremiumF2"),
-        t("home.planPremiumF3"),
-      ],
+      key: "firms",
+      name: t("price.firms"),
+      price: t("price.firmsPrice"),
+      body: t("price.firmsBody"),
+      cta: { label: t("price.firmsCta"), href: "/lawyer/register" },
+    },
+    {
+      key: "unis",
+      name: t("price.unis"),
+      price: t("price.unisPrice"),
+      body: t("price.unisBody"),
+      cta: { label: t("price.contact"), href: contactHref },
+    },
+    {
+      key: "white",
+      name: t("price.white"),
+      price: t("price.whitePrice"),
+      body: t("price.whiteBody"),
+      cta: { label: t("price.contact"), href: contactHref },
     },
   ];
 
   return (
-    <Section id="pricing" title={t("home.pricingTitle")} lead={t("home.pricingBeta")}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {plans.map((plan) => {
-          const current = user?.tier === plan.tier;
-          return (
-            <Card
-              key={plan.tier}
-              className={
-                current
-                  ? "border-brand ring-1 ring-brand/30"
-                  : plan.tier === "premium"
-                    ? "bg-gradient-to-br from-brand-50/60 to-white"
-                    : undefined
-              }
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="font-semibold text-slate-800">{plan.name}</h3>
-                <span className="text-sm font-medium text-brand-700">{plan.price}</span>
-              </div>
-              <ul className="mt-3 flex flex-col gap-1.5 text-sm text-slate-600">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex gap-2">
-                    <span aria-hidden className="text-brand">
-                      ✓
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-5">
-                {!user ? (
-                  <Link href="/login">
-                    <Button variant="secondary">{t("home.planSignUp")}</Button>
-                  </Link>
-                ) : current ? (
-                  <span className="text-xs font-medium text-slate-500">
-                    {t("home.planCurrent")}
-                  </span>
-                ) : (
-                  <Button disabled={saving !== null} onClick={() => choose(plan.tier)}>
-                    {saving === plan.tier ? t("home.planActivating") : t("home.planActivate")}
-                  </Button>
-                )}
-              </div>
-            </Card>
-          );
-        })}
+    <Section id="pricing" title={t("price.title")} lead={t("price.lead")}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {plans.map((plan) => (
+          <Card
+            key={plan.key}
+            className={
+              plan.highlight
+                ? "flex flex-col border-brand ring-1 ring-brand/30"
+                : "flex flex-col"
+            }
+          >
+            <h3 className="font-semibold text-slate-800">{plan.name}</h3>
+            <p className="mt-1 text-lg font-semibold text-brand-700">{plan.price}</p>
+            <p className="mt-2 flex-1 text-sm text-slate-600">{plan.body}</p>
+            <div className="mt-4">
+              <Link href={plan.cta.href}>
+                <Button variant={plan.highlight ? "primary" : "secondary"}>
+                  {plan.cta.label}
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        ))}
       </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </Section>
+  );
+}
+
+/** Slide 12: real lawyers, data that stays in Germany. */
+function Trust() {
+  const { t } = useI18n();
+  const items = [
+    { title: t("trust.verifiedTitle"), body: t("trust.verifiedBody") },
+    { title: t("trust.dataTitle"), body: t("trust.dataBody") },
+    { title: t("trust.offlineTitle"), body: t("trust.offlineBody") },
+  ];
+  return (
+    <Section id="trust" title={t("trust.title")}>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {items.map((item) => (
+          <Card key={item.title}>
+            <h3 className="font-semibold text-slate-800">{item.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.body}</p>
+          </Card>
+        ))}
+      </div>
     </Section>
   );
 }
@@ -458,6 +466,7 @@ export default function HomePage() {
       <Lawyers items={lawyers.items} total={lawyers.total} />
       <MobileApp />
       <Offline />
+      <Trust />
       <Pricing />
       <ForLawyers />
       <footer className="border-t border-slate-200/70 py-8 text-xs leading-relaxed text-slate-400">

@@ -12,7 +12,7 @@ import {
 import { useRequireRole } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { usePwa } from "@/lib/pwa";
-import { Button, Card, Spinner, Stars, StatusPill, Tabs } from "@/components/ui";
+import { Button, Card, Spinner, Stars, StatusPill, Tabs, VerifiedBadge } from "@/components/ui";
 import {
   CATEGORY_KEY,
   FeedbackButton,
@@ -21,8 +21,9 @@ import {
 import { OrdersTab } from "@/components/lawyer/OrdersTab";
 import { ProfileTab } from "@/components/lawyer/ProfileTab";
 import { FinanceTab, StatsTab } from "@/components/lawyer/StatsTab";
+import { VerificationTab, subscriptionLine } from "@/components/lawyer/VerificationTab";
 
-type Tab = "orders" | "deals" | "stats" | "finance" | "profile" | "feedback";
+type Tab = "orders" | "deals" | "stats" | "finance" | "profile" | "verification" | "feedback";
 
 /** Install the portal as a desktop app (it is a PWA), or fetch the offline
  *  build when one is published. */
@@ -107,7 +108,7 @@ export default function LawyerPortalPage() {
       </div>
     );
 
-  const { quota, profile } = me;
+  const { subscription, profile } = me;
   const pending = orders.filter((o) => o.status === "pending").length;
 
   // One order changed: swap it in, then refresh the numbers that depend on it.
@@ -131,6 +132,7 @@ export default function LawyerPortalPage() {
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
             {[profile.law_firm, profile.city].filter(Boolean).join(" · ")}
             <StatusPill status={me.approval} label={t(`lp.approval.${me.approval}`)} />
+            {me.verification.is_verified && <VerifiedBadge label={t("lawyers.verified")} />}
             {profile.rating_avg != null && (
               <span className="flex items-center gap-1">
                 <Stars value={profile.rating_avg} size="text-sm" />
@@ -141,13 +143,22 @@ export default function LawyerPortalPage() {
         </div>
         <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-2 text-end">
           <div className="text-lg font-bold text-brand-700">
-            {quota.free_remaining > 0
-              ? t("lp.quota.free", { left: quota.free_remaining, total: quota.free_total })
-              : t("lp.quota.left", { left: quota.remaining })}
+            {subscriptionLine(subscription, t, locale)}
           </div>
-          <div className="text-xs text-slate-500">{t("lp.quota.caption")}</div>
+          <div className="text-xs text-slate-500">
+            {t("lp.sub.caption", {
+              fee: subscription.monthly_fee,
+              months: subscription.trial_months,
+            })}
+          </div>
         </div>
       </div>
+
+      {me.verification.is_suspended && (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+          {t("lp.ver.suspended")}
+        </div>
+      )}
 
       {me.approval !== "approved" && (
         <div
@@ -178,6 +189,7 @@ export default function LawyerPortalPage() {
           { id: "stats", label: t("lp.tab.stats") },
           { id: "finance", label: t("lp.tab.finance") },
           { id: "profile", label: t("lp.tab.profile") },
+          { id: "verification", label: t("lp.tab.verification") },
           { id: "feedback", label: t("lp.tab.feedback") },
         ]}
       />
@@ -194,6 +206,7 @@ export default function LawyerPortalPage() {
       {tab === "stats" && <StatsTab stats={stats} me={me} />}
       {tab === "finance" && <FinanceTab stats={stats} me={me} orders={orders} />}
       {tab === "profile" && <ProfileTab me={me} onSaved={setMe} />}
+      {tab === "verification" && <VerificationTab me={me} onSaved={setMe} />}
       {tab === "feedback" && (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-slate-500">{t("lp.fb.historyLead")}</p>

@@ -3,6 +3,7 @@
 import { type LawyerMe, type LawyerOrder, type LawyerStats } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { Card, Stars, Stat } from "@/components/ui";
+import { subscriptionLine } from "@/components/lawyer/VerificationTab";
 
 const pct = (value: number | null) => (value == null ? "—" : `${Math.round(value * 100)}%`);
 
@@ -143,7 +144,7 @@ export function FinanceTab({
   const money = (v: number) =>
     v.toLocaleString(locale, { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
   const { finance } = stats;
-  const { quota } = me;
+  const { subscription } = me;
   const deals = orders.filter((o) => o.status === "closed_won");
 
   return (
@@ -160,40 +161,26 @@ export function FinanceTab({
           label={t("lp.fin.avgDeal")}
         />
         <Stat
-          value={money(finance.platform_fees)}
-          label={t("lp.fin.fees")}
-          hint={t("lp.fin.feesHint")}
+          value={subscription.state === "trial" ? money(0) : money(subscription.monthly_fee)}
+          label={t("lp.fin.subscription")}
+          hint={t("lp.fin.flat")}
         />
       </div>
 
       <Card>
-        <h3 className="mb-3 font-semibold text-slate-900">{t("lp.fin.allowance")}</h3>
-        <div className="grid gap-4 text-sm sm:grid-cols-3">
-          <div>
-            <div className="text-xl font-bold text-slate-900">
-              {finance.free_orders_used} / {quota.free_total}
-            </div>
-            <div className="text-slate-500">{t("lp.fin.freeUsed")}</div>
-          </div>
-          <div>
-            <div className="text-xl font-bold text-slate-900">
-              {finance.paid_orders_used} / {quota.extra}
-            </div>
-            <div className="text-slate-500">{t("lp.fin.extraUsed")}</div>
-          </div>
-          <div>
-            <div className="text-xl font-bold text-brand">{quota.remaining}</div>
-            <div className="text-slate-500">{t("lp.fin.remaining")}</div>
-          </div>
-        </div>
-        {quota.remaining === 0 && (
+        <h3 className="mb-2 font-semibold text-slate-900">{t("lp.fin.subscription")}</h3>
+        <p className="text-xl font-bold text-slate-900">{subscriptionLine(subscription, t, locale)}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {t("lp.sub.caption", { fee: subscription.monthly_fee, months: subscription.trial_months })}
+        </p>
+        {subscription.state === "expired" && (
           <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {t("lp.paywall.body", { count: quota.free_total })}
-            {quota.contact_email && (
+            {t("lp.paywall.expiredBody", { fee: subscription.monthly_fee })}
+            {subscription.contact_email && (
               <>
                 {" "}
-                <a className="font-medium underline" href={`mailto:${quota.contact_email}`}>
-                  {quota.contact_email}
+                <a className="font-medium underline" href={`mailto:${subscription.contact_email}`}>
+                  {subscription.contact_email}
                 </a>
               </>
             )}

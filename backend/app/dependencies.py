@@ -76,6 +76,10 @@ def require_data_consent(user: User = Depends(get_current_user)) -> User:
     """Case data reaches the server only with the user's explicit consent
     (GDPR Art. 6(1)(a), 9(2)(a)). Without it, the offline app is the way to
     use Francesca. Lawyers and admins do not store client cases."""
+    from app.config import settings
+
+    if settings.data_on_device:
+        return user
     if user.role == UserRole.user and user.data_consent_at is None:
         raise HTTPException(
             status_code=status.HTTP_428_PRECONDITION_REQUIRED,

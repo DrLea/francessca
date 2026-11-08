@@ -5,7 +5,7 @@ import { api, type Lawyer } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import { SendCaseDialog } from "@/components/SendCaseDialog";
-import { Badge, Button, Card, Input, Spinner, Stars } from "@/components/ui";
+import { Badge, Button, Card, Input, Spinner, Stars, VerifiedBadge } from "@/components/ui";
 
 export default function LawyersPage() {
   const { user, loading } = useRequireAuth();
@@ -70,7 +70,12 @@ export default function LawyersPage() {
         {results.map((lw) => (
           <Card key={lw.id} className="transition-shadow hover:shadow-lg">
             <div className="flex items-baseline justify-between">
-              <h2 className="font-semibold text-slate-900">{lw.name}</h2>
+              <h2 className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                {lw.name}
+                {lw.is_verified && (
+                  <VerifiedBadge label={t("lawyers.verified")} hint={t("lawyers.verifiedHint")} />
+                )}
+              </h2>
               <span className="text-sm text-slate-500">{lw.city}</span>
             </div>
             {lw.law_firm && <p className="text-sm text-slate-600">{lw.law_firm}</p>}

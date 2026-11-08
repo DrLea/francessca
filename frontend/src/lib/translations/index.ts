@@ -10,9 +10,13 @@ import ro from "./ro";
 import portalEn, { type PortalKey } from "./portal.en";
 import portalDe from "./portal.de";
 import { portalAr, portalPl, portalRo, portalRu, portalTr, portalUk } from "./portal.client";
+import deckEn, { type DeckKey } from "./deck.en";
+import deckDe from "./deck.de";
+import { deckAr, deckPl, deckRo, deckRu, deckTr, deckUk } from "./deck.client";
 
-/** Every key the UI can ask for: the original set plus the portal set. */
-export type FullTranslationKey = TranslationKey | PortalKey;
+/** Every key the UI can ask for: the original set, the portal set and the
+ *  strings added to match the pitch deck. */
+export type FullTranslationKey = TranslationKey | PortalKey | DeckKey;
 export type { FullTranslationKey as TranslationKey };
 export type Dictionary = Record<FullTranslationKey, string>;
 
@@ -22,17 +26,18 @@ export type Dictionary = Record<FullTranslationKey, string>;
 const withPortal = (
   base: Record<TranslationKey, string>,
   portal: Partial<Record<PortalKey, string>> = {},
-): Dictionary => ({ ...portalEn, ...portal, ...base });
+  deck: Partial<Record<DeckKey, string>> = {},
+): Dictionary => ({ ...portalEn, ...portal, ...deckEn, ...deck, ...base });
 
 export const dictionaries: Record<string, Dictionary> = {
   en: withPortal(en),
-  de: withPortal(de, portalDe),
-  tr: withPortal(tr, portalTr),
-  ar: withPortal(ar, portalAr),
-  uk: withPortal(uk, portalUk),
-  ru: withPortal(ru, portalRu),
-  pl: withPortal(pl, portalPl),
-  ro: withPortal(ro, portalRo),
+  de: withPortal(de, portalDe, deckDe),
+  tr: withPortal(tr, portalTr, deckTr),
+  ar: withPortal(ar, portalAr, deckAr),
+  uk: withPortal(uk, portalUk, deckUk),
+  ru: withPortal(ru, portalRu, deckRu),
+  pl: withPortal(pl, portalPl, deckPl),
+  ro: withPortal(ro, portalRo, deckRo),
 };
 
 export type LangCode = keyof typeof dictionaries;

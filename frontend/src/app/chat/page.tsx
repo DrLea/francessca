@@ -39,7 +39,6 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<number | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [remaining, setRemaining] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -150,7 +149,6 @@ export default function ChatPage() {
         ...payload,
       });
       setActiveId(res.conversation_id);
-      setRemaining(res.tokens_remaining);
       pendingScroll.current = BOTTOM;
       setMessages((m) => [
         // Swap the local echo for the message the server actually stored.
@@ -245,11 +243,8 @@ export default function ChatPage() {
       {/* Chat panel */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          {remaining !== null && (
-            <span className="text-xs text-slate-500">
-              {t("chat.tokensRemaining", { count: remaining.toLocaleString(locale) })}
-            </span>
-          )}
+          {/* Francesca is free for people: no allowance to show. */}
+          <span />
           {activeId && (
             <Button onClick={exportCase} disabled={exporting} variant="ghost">
               {exporting ? t("chat.generating") : t("chat.exportPdf")}

@@ -6,6 +6,7 @@ import { api, type ClientOrder } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/translations";
+import { ReportDialog } from "@/components/ReportDialog";
 import { Button, Card, Spinner, Stars, StatusPill, Textarea } from "@/components/ui";
 
 const STATUS_KEY: Record<ClientOrder["status"], TranslationKey> = {
@@ -13,6 +14,7 @@ const STATUS_KEY: Record<ClientOrder["status"], TranslationKey> = {
   accepted: "req.status.accepted",
   declined: "req.status.declined",
   cancelled: "req.status.cancelled",
+  withdrawn: "req.status.withdrawn",
   closed_won: "req.status.closed",
   closed_lost: "req.status.closed",
 };
@@ -71,6 +73,7 @@ export default function RequestsPage() {
   const { t, locale } = useI18n();
   const [orders, setOrders] = useState<ClientOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<ClientOrder | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -87,6 +90,15 @@ export default function RequestsPage() {
     if (!window.confirm(t("req.cancelConfirm"))) return;
     try {
       replace(await api.cancelOrder(order.id));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function withdraw(order: ClientOrder) {
+    if (!window.confirm(t("req.withdrawConfirm"))) return;
+    try {
+      replace(await api.withdrawOrder(order.id));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -174,8 +186,29 @@ export default function RequestsPage() {
             </div>
           )}
           {order.can_review && <ReviewForm order={order} onDone={replace} />}
+
+          {/* Consent per case: it can be taken back after the lawyer has
+              seen the case, too. Reporting is always possible. */}
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+            {["accepted", "closed_won", "closed_lost"].includes(order.status) && (
+              <Button variant="ghost" onClick={() => withdraw(order)}>
+                {t("req.withdraw")}
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setReporting(order)}>
+              {t("req.report")}
+            </Button>
+          </div>
         </Card>
       ))}
+
+      {reporting && (
+        <ReportDialog
+          lawyer={reporting.lawyer}
+          orderId={reporting.id}
+          onClose={() => setReporting(null)}
+        />
+      )}
 
       {orders?.length === 0 && (
         <Card className="text-center">

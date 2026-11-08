@@ -342,6 +342,7 @@ const STATUS_TONE: Record<string, string> = {
   reviewed: "bg-slate-100 text-slate-600",
   declined: "bg-slate-100 text-slate-600",
   cancelled: "bg-slate-100 text-slate-500",
+  withdrawn: "bg-slate-100 text-slate-500",
   closed_lost: "bg-slate-100 text-slate-600",
   rejected: "bg-red-50 text-red-700",
 };
@@ -368,6 +369,19 @@ export function QualityMeter({ score, label }: { score: number; label?: string }
         <span className={clsx("block h-full rounded-full", tone)} style={{ width: `${score}%` }} />
       </span>
       <span className="font-medium tabular-nums text-slate-700">{score}</span>
+    </span>
+  );
+}
+
+/** "Verified": register, beA code and ID checked within the last year. */
+export function VerifiedBadge({ label, hint }: { label: string; hint?: string }) {
+  return (
+    <span
+      title={hint}
+      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+    >
+      <span aria-hidden>✓</span>
+      {label}
     </span>
   );
 }

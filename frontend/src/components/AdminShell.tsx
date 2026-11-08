@@ -12,6 +12,8 @@ import { Spinner } from "@/components/ui";
 const PAGES = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/lawyers", label: "Lawyers" },
+  { href: "/admin/reports", label: "Reports" },
+  { href: "/admin/partners", label: "Partners" },
   { href: "/admin/feedback", label: "Feedback" },
 ];
 
