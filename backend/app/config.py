@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     frontend_url: str = Field("http://localhost:3000", alias="FRONTEND_URL")
     backend_url: str = Field("http://localhost:8000", alias="BACKEND_URL")
     cors_origins: str = Field("http://localhost:3000", alias="CORS_ORIGINS")
+    # Mount the API under this prefix (e.g. "/api") when a reverse proxy or
+    # tunnel routes /api/* to the backend without rewriting the path. Empty
+    # keeps the routes at the root; FRONTEND_DIST (desktop) implies "/api".
+    api_prefix: str = Field("", alias="API_PREFIX")
+    # Swagger UI / ReDoc / openapi.json. Off unless explicitly enabled.
+    enable_docs: bool = Field(False, alias="ENABLE_DOCS")
 
     # App behaviour
     # Hidden fair-use cap: tokens per user per rolling 24 h. People never

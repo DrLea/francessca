@@ -8,10 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from app.api.routes import (
     admin,
@@ -30,11 +29,10 @@ from app.api.routes import (
 )
 from app.config import settings
 from app.core.logging import configure_logging, get_logger
+from app.core.ratelimit import limiter
 
 configure_logging()
 log = get_logger("francessca.app")
-
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 app = FastAPI(
     title="Francesca API",
@@ -43,6 +41,9 @@ app = FastAPI(
         "Francesca helps users prepare for speaking with a qualified lawyer. "
         "It is NOT a legal consultation platform and does not provide legal advice."
     ),
+    docs_url="/docs" if settings.enable_docs else None,
+    redoc_url="/redoc" if settings.enable_docs else None,
+    openapi_url="/openapi.json" if settings.enable_docs else None,
 )
 
 @app.on_event("startup")
@@ -95,12 +96,23 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+if settings.api_prefix.strip("/"):
+    # Same check, reachable through a proxy that only forwards /api/*.
+    app.add_api_route(
+        f"/{settings.api_prefix.strip('/')}/health", health, methods=["GET"], tags=["meta"]
+    )
+
+
 # The API and the UI have pages with the same names -- /chat, /lawyers,
 # /files, /dashboard, /timeline. On separate origins that is fine; in the
 # desktop build they share one, and the API route would shadow the page (the
 # browser asking for /chat got {"detail":"Not authenticated"}). So when this
 # process also serves the UI, the whole API moves under /api.
-API_PREFIX = "/api" if settings.frontend_dist else ""
+API_PREFIX = (
+    "/" + settings.api_prefix.strip("/")
+    if settings.api_prefix.strip("/")
+    else ("/api" if settings.frontend_dist else "")
+)
 
 for router in (
     auth,

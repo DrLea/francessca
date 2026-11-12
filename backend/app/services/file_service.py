@@ -141,7 +141,9 @@ class FileService:
         os.makedirs(settings.upload_dir, exist_ok=True)
 
     def save_upload(self, user: User, upload: UploadFile) -> Document:
-        content = upload.file.read()
+        # Read at most one byte past the cap so an oversized upload is
+        # rejected without pulling the whole body into memory.
+        content = upload.file.read(settings.max_upload_size + 1)
         size = len(content)
 
         if size == 0:
@@ -164,7 +166,10 @@ class FileService:
         # and path traversal via the original filename.
         user_dir = os.path.join(settings.upload_dir, str(user.id))
         os.makedirs(user_dir, exist_ok=True)
-        safe_name = f"{uuid.uuid4().hex}{os.path.splitext(upload.filename or '')[1]}"
+        ext = os.path.splitext(upload.filename or "")[1].lower()
+        if not re.fullmatch(r"\.[a-z0-9]{1,8}", ext):
+            ext = ""
+        safe_name = f"{uuid.uuid4().hex}{ext}"
         stored_path = os.path.join(user_dir, safe_name)
         write_encrypted(stored_path, content)  # AES-256-GCM at rest
 
