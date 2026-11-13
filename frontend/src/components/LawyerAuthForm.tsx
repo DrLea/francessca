@@ -88,6 +88,8 @@ export function LawyerAuthForm({ mode }: { mode: "login" | "register" }) {
   return (
     <main className="mx-auto grid max-w-4xl gap-8 px-6 py-12 md:grid-cols-[1fr_1.1fr]">
       <div className="md:pt-6">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/logo-full.png" alt="Francesca" width={80} height={78} className="mb-5 h-20 w-auto" />
         <p className="mb-3 inline-block rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
           {t("lp.auth.badge")}
         </p>

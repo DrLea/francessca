@@ -83,7 +83,8 @@ export function NavBar() {
           href={isLawyer ? "/lawyer" : "/"}
           className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-slate-900"
         >
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-brand" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/mark.png" alt="" width={28} height={28} className="h-7 w-7 rounded-md" />
           Francesca
           {onLawyerSide && (
             <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">

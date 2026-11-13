@@ -2,7 +2,7 @@
 // shell — above all the offline assistant at /offline — open with no
 // network. It never touches the API: user data is not cached here.
 
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `francessca-shell-${VERSION}`;
 const PRECACHE = [
   "/",
@@ -10,6 +10,7 @@ const PRECACHE = [
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/brand/mark.png",
 ];
 
 self.addEventListener("install", (event) => {

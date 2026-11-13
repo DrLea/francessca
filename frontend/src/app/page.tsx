@@ -120,8 +120,18 @@ function Hero({ lawyerCount }: { lawyerCount: number }) {
           <p className="mb-3 inline-block rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-100">
             {t("home.betaBadge")}
           </p>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-            Franc<span className="text-brand">essca</span>
+          <h1 className="flex items-center gap-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/mark.png"
+              alt=""
+              width={64}
+              height={64}
+              className="h-14 w-14 rounded-2xl shadow-soft sm:h-16 sm:w-16"
+            />
+            <span>
+              Franc<span className="text-brand">esca</span>
+            </span>
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600">
             {t("home.tagline")}

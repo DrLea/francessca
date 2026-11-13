@@ -68,6 +68,8 @@ export default function LoginPage() {
   return (
     <main className="mx-auto max-w-md px-6 py-16">
       <Card className="animate-fade-in">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/logo-full.png" alt="Francesca" width={96} height={93} className="mx-auto mb-5 h-24 w-auto" />
         <h1 className="mb-4 text-2xl font-semibold tracking-tight text-slate-900">
           {mode === "login" ? t("login.titleLogin") : t("login.titleRegister")}
         </h1>
